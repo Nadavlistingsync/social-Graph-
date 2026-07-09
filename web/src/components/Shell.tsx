@@ -9,6 +9,63 @@ const links = [
   { to: '/paths', label: 'Path Finder' },
 ]
 
+const GUIDE_KEY = 'sg-guide-seen'
+
+function WelcomeGuide({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate()
+  return (
+    <div className="guide-overlay" role="dialog" aria-modal="true" aria-label="Welcome">
+      <div className="guide-backdrop" onClick={onClose} />
+      <div className="guide-card">
+        <div className="guide-kicker">Warm intro network</div>
+        <h2 className="guide-title">
+          Who is the best person I know who can credibly get me to a target?
+        </h2>
+        <p className="guide-lede">
+          Social Graph maps the public relationships around anyone, then ranks the warmest,
+          most credible path from your network to them — with evidence on every hop.
+        </p>
+        <ol className="guide-steps">
+          <li>
+            <strong>Graph</strong> — explore the network as typed, cited relationships.
+          </li>
+          <li>
+            <strong>Person</strong> — read any node like a note: claims, citations, private notes.
+          </li>
+          <li>
+            <strong>Path Finder</strong> — get ranked intro paths and the best first ask.
+          </li>
+        </ol>
+        <div className="guide-actions">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => {
+              navigate('/paths?to=donald-trump')
+              onClose()
+            }}
+          >
+            Show me the path to Donald Trump
+          </button>
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              navigate('/')
+              onClose()
+            }}
+          >
+            Explore the graph
+          </button>
+        </div>
+        <button type="button" className="guide-dismiss" onClick={onClose} aria-label="Close">
+          Skip intro
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Shell({
   children,
   title,
@@ -22,9 +79,26 @@ export function Shell({
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const results = useMemo(() => (open ? searchNodes(q).slice(0, 8) : []), [q, open])
+  const [showGuide, setShowGuide] = useState(() => {
+    try {
+      return !localStorage.getItem(GUIDE_KEY)
+    } catch {
+      return true
+    }
+  })
+
+  function closeGuide() {
+    setShowGuide(false)
+    try {
+      localStorage.setItem(GUIDE_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
     <div className="app-shell">
+      {showGuide && <WelcomeGuide onClose={closeGuide} />}
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">Social Graph</div>
@@ -90,6 +164,9 @@ export function Shell({
           <span className="topbar-title" style={{ marginLeft: 'auto' }}>
             {nodes.filter((n) => n.knownByUser).length} warm contacts
           </span>
+          <button type="button" className="chip" onClick={() => setShowGuide(true)}>
+            Guide
+          </button>
         </header>
         <div className="view-body">{children}</div>
       </div>

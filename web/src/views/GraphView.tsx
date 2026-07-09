@@ -8,7 +8,7 @@ import {
 } from 'd3-force'
 import { select } from 'd3-selection'
 import { drag } from 'd3-drag'
-import { zoom, zoomIdentity } from 'd3-zoom'
+import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EDGE_TYPES, edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
@@ -48,10 +48,50 @@ export function GraphView() {
   )
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
+  const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const simNodesRef = useRef<SimNode[]>([])
 
   useEffect(() => {
     setSelectedId(focusId)
   }, [focusId])
+
+  function fitToView() {
+    const svgEl = svgRef.current
+    const zoomB = zoomRef.current
+    const ns = simNodesRef.current
+    if (!svgEl || !zoomB || ns.length === 0) return
+    const width = svgEl.clientWidth || 800
+    const height = svgEl.clientHeight || 600
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    ns.forEach((n) => {
+      if (n.x == null || n.y == null) return
+      minX = Math.min(minX, n.x)
+      maxX = Math.max(maxX, n.x)
+      minY = Math.min(minY, n.y)
+      maxY = Math.max(maxY, n.y)
+    })
+    if (!Number.isFinite(minX)) return
+    const pad = 90
+    const w = maxX - minX || 1
+    const h = maxY - minY || 1
+    const scale = Math.min(
+      2.2,
+      Math.max(0.3, 0.92 * Math.min(width / (w + pad * 2), height / (h + pad * 2))),
+    )
+    const tx = width / 2 - (scale * (minX + maxX)) / 2
+    const ty = height / 2 - (scale * (minY + maxY)) / 2
+    select(svgEl).call(zoomB.transform, zoomIdentity.translate(tx, ty).scale(scale))
+  }
+
+  function zoomBy(factor: number) {
+    const svgEl = svgRef.current
+    const zoomB = zoomRef.current
+    if (!svgEl || !zoomB) return
+    select(svgEl).call(zoomB.scaleBy, factor)
+  }
 
   useEffect(() => {
     setEnabledTypes((prev) => {
@@ -116,6 +156,7 @@ export function GraphView() {
     const height = svgEl.clientHeight || 600
 
     const simNodes: SimNode[] = graphNodes.map((n) => ({ ...n }))
+    simNodesRef.current = simNodes
     const simLinks: SimLink[] = filteredEdges
       .filter((e) => activeNodeIds.has(e.source) && activeNodeIds.has(e.target))
       .map((e) => ({ source: e.source, target: e.target, edge: e }))
@@ -229,16 +270,23 @@ export function GraphView() {
       nodeG.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
     })
 
+    simulation.on('end', () => fitToView())
+
     const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.25, 3])
       .on('zoom', (event) => {
         select(gEl).attr('transform', event.transform)
       })
+    zoomRef.current = zoomBehavior
 
     select(svgEl).call(zoomBehavior as never)
     select(svgEl).call(zoomBehavior.transform as never, zoomIdentity.translate(0, 0).scale(1))
 
+    // Fallback auto-fit in case the simulation settles slowly.
+    const fitTimer = window.setTimeout(() => fitToView(), 700)
+
     return () => {
+      window.clearTimeout(fitTimer)
       simulation.stop()
     }
   }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
@@ -287,6 +335,32 @@ export function GraphView() {
           <svg ref={svgRef}>
             <g ref={gRef} />
           </svg>
+          <div className="graph-controls">
+            <button type="button" className="zoom-btn" onClick={() => zoomBy(1.3)} aria-label="Zoom in">
+              +
+            </button>
+            <button type="button" className="zoom-btn" onClick={() => zoomBy(1 / 1.3)} aria-label="Zoom out">
+              −
+            </button>
+            <button type="button" className="zoom-btn fit" onClick={fitToView} aria-label="Fit to view">
+              ⤢
+            </button>
+          </div>
+          <div className="graph-legend">
+            <div className="legend-row">
+              <span className="legend-dot you" /> You
+            </div>
+            <div className="legend-row">
+              <span className="legend-dot person" /> Person
+            </div>
+            <div className="legend-row">
+              <span className="legend-dot company" /> Company
+            </div>
+            <div className="legend-row">
+              <span className="legend-dot entity" /> Deal / entity
+            </div>
+            <div className="legend-row legend-note">Ring = warm contact · thicker = stronger</div>
+          </div>
           <div className="graph-hint">Scroll to zoom · drag nodes · double-click opens note</div>
         </div>
         <aside className="side-panel">
