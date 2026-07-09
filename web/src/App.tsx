@@ -7,9 +7,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<GraphView />} />
+        <Route path="/" element={<PathFinder />} />
+        <Route path="/graph" element={<GraphView />} />
         <Route path="/person/:id" element={<PersonPage />} />
-        <Route path="/paths" element={<PathFinder />} />
+        <Route path="/paths" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

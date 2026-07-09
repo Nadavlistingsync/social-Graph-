@@ -8,10 +8,10 @@ import {
 } from 'd3-force'
 import { select } from 'd3-selection'
 import { drag } from 'd3-drag'
-import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
+import { zoom, zoomIdentity } from 'd3-zoom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { EDGE_TYPES, edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
+import { edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
 import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
@@ -25,15 +25,13 @@ function nodeFill(n: GraphNode): string {
   if (n.id === YOU_ID) return 'var(--you)'
   if (n.type === 'person') return '#b8c4d4'
   if (n.type === 'company') return '#8fa3b8'
-  if (n.type === 'property' || n.type === 'deal') return '#9a8f7a'
-  return '#7a756c'
+  return '#9a8f7a'
 }
 
 function nodeRadius(n: GraphNode): number {
   if (n.id === YOU_ID) return 14
   if (n.type === 'person') return n.knownByUser ? 11 : 9
-  if (n.type === 'company') return 8
-  return 6.5
+  return 7
 }
 
 export function GraphView() {
@@ -42,74 +40,20 @@ export function GraphView() {
   const focusId = params.get('focus') ?? YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
   const [hideWeak, setHideWeak] = useState(true)
-  const [highlightPath, setHighlightPath] = useState(true)
-  const [enabledTypes, setEnabledTypes] = useState<Set<string>>(
-    () => new Set(EDGE_TYPES.filter((t) => t !== 'weak public mention' || !hideWeak)),
-  )
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
-  const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
-  const simNodesRef = useRef<SimNode[]>([])
 
   useEffect(() => {
     setSelectedId(focusId)
   }, [focusId])
 
-  function fitToView() {
-    const svgEl = svgRef.current
-    const zoomB = zoomRef.current
-    const ns = simNodesRef.current
-    if (!svgEl || !zoomB || ns.length === 0) return
-    const width = svgEl.clientWidth || 800
-    const height = svgEl.clientHeight || 600
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
-    ns.forEach((n) => {
-      if (n.x == null || n.y == null) return
-      minX = Math.min(minX, n.x)
-      maxX = Math.max(maxX, n.x)
-      minY = Math.min(minY, n.y)
-      maxY = Math.max(maxY, n.y)
-    })
-    if (!Number.isFinite(minX)) return
-    const pad = 90
-    const w = maxX - minX || 1
-    const h = maxY - minY || 1
-    const scale = Math.min(
-      2.2,
-      Math.max(0.3, 0.92 * Math.min(width / (w + pad * 2), height / (h + pad * 2))),
-    )
-    const tx = width / 2 - (scale * (minX + maxX)) / 2
-    const ty = height / 2 - (scale * (minY + maxY)) / 2
-    select(svgEl).call(zoomB.transform, zoomIdentity.translate(tx, ty).scale(scale))
-  }
-
-  function zoomBy(factor: number) {
-    const svgEl = svgRef.current
-    const zoomB = zoomRef.current
-    if (!svgEl || !zoomB) return
-    select(svgEl).call(zoomB.scaleBy, factor)
-  }
-
-  useEffect(() => {
-    setEnabledTypes((prev) => {
-      const next = new Set(prev)
-      if (hideWeak) next.delete('weak public mention')
-      else next.add('weak public mention')
-      // also filter by strength visually via hideWeak
-      return next
-    })
-  }, [hideWeak])
-
   const filteredEdges = useMemo(() => {
     return edges.filter((e) => {
-      if (!enabledTypes.has(e.type)) return false
+      if (e.type === 'weak public mention' && hideWeak) return false
       if (hideWeak && e.strength < WEAK_THRESHOLD) return false
       return true
     })
-  }, [enabledTypes, hideWeak])
+  }, [hideWeak])
 
   const activeNodeIds = useMemo(() => {
     const ids = new Set<string>()
@@ -128,24 +72,24 @@ export function GraphView() {
   )
 
   const selected = getNode(selectedId)
-  const selectedEdges = selected ? getEdgesForNode(selected.id) : []
+  const selectedEdges = selected
+    ? getEdgesForNode(selected.id).filter((e) => !hideWeak || e.strength >= WEAK_THRESHOLD)
+    : []
 
-  // Path highlight: strongest ranked path from you to selected
   const { pathNodeIds, pathEdgeIds } = useMemo(() => {
     const empty = { pathNodeIds: new Set<string>(), pathEdgeIds: new Set<string>() }
-    if (!highlightPath || selectedId === YOU_ID) return empty
+    if (selectedId === YOU_ID) return empty
     const paths = findPaths(selectedId, {
       maxDepth: 5,
-      maxPaths: 5,
+      maxPaths: 3,
       minStrength: hideWeak ? WEAK_THRESHOLD : 0.15,
-      allowedTypes: [...enabledTypes],
     })
     if (!paths.length) return empty
     return {
       pathNodeIds: new Set(paths[0].nodeIds),
       pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
     }
-  }, [selectedId, highlightPath, hideWeak, enabledTypes])
+  }, [selectedId, hideWeak])
 
   useEffect(() => {
     const svgEl = svgRef.current
@@ -156,7 +100,6 @@ export function GraphView() {
     const height = svgEl.clientHeight || 600
 
     const simNodes: SimNode[] = graphNodes.map((n) => ({ ...n }))
-    simNodesRef.current = simNodes
     const simLinks: SimLink[] = filteredEdges
       .filter((e) => activeNodeIds.has(e.source) && activeNodeIds.has(e.target))
       .map((e) => ({ source: e.source, target: e.target, edge: e }))
@@ -181,14 +124,14 @@ export function GraphView() {
 
     const link = g
       .append('g')
-      .attr('class', 'links')
       .selectAll('line')
       .data(simLinks)
       .join('line')
       .attr('stroke', (d) => {
-        const s = d.edge.strength
         if (pathEdgeIds.has(d.edge.id)) return '#c4a35a'
-        return s < WEAK_THRESHOLD ? '#3d4455' : `rgba(154, 149, 140, ${0.25 + s * 0.55})`
+        return d.edge.strength < WEAK_THRESHOLD
+          ? '#3d4455'
+          : `rgba(154, 149, 140, ${0.25 + d.edge.strength * 0.55})`
       })
       .attr('stroke-width', (d) =>
         pathEdgeIds.has(d.edge.id)
@@ -202,7 +145,6 @@ export function GraphView() {
 
     const nodeG = g
       .append('g')
-      .attr('class', 'nodes')
       .selectAll('g')
       .data(simNodes)
       .join('g')
@@ -270,38 +212,22 @@ export function GraphView() {
       nodeG.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
     })
 
-    simulation.on('end', () => fitToView())
-
     const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.25, 3])
       .on('zoom', (event) => {
         select(gEl).attr('transform', event.transform)
       })
-    zoomRef.current = zoomBehavior
 
     select(svgEl).call(zoomBehavior as never)
-    select(svgEl).call(zoomBehavior.transform as never, zoomIdentity.translate(0, 0).scale(1))
-
-    // Fallback auto-fit in case the simulation settles slowly.
-    const fitTimer = window.setTimeout(() => fitToView(), 700)
+    select(svgEl).call(zoomBehavior.transform as never, zoomIdentity)
 
     return () => {
-      window.clearTimeout(fitTimer)
       simulation.stop()
     }
   }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
 
-  function toggleType(t: string) {
-    setEnabledTypes((prev) => {
-      const next = new Set(prev)
-      if (next.has(t)) next.delete(t)
-      else next.add(t)
-      return next
-    })
-  }
-
   return (
-    <Shell title="Graph view" active="graph">
+    <Shell active="graph">
       <div className="graph-layout">
         <div className="graph-canvas-wrap">
           <div className="graph-toolbar">
@@ -310,97 +236,43 @@ export function GraphView() {
               className={`chip ${hideWeak ? 'on' : ''}`}
               onClick={() => setHideWeak((v) => !v)}
             >
-              {hideWeak ? 'Weak links hidden' : 'Show weak links'}
+              {hideWeak ? 'Strong links only' : 'Show weak links'}
             </button>
-            <button
-              type="button"
-              className={`chip ${highlightPath ? 'on' : ''}`}
-              onClick={() => setHighlightPath((v) => !v)}
-            >
-              Highlight intro path
-            </button>
-            {(['lawyer', 'family', 'partner', 'political ally', 'co-founder', 'investor', 'podcast guest'] as const).map(
-              (t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={`chip ${enabledTypes.has(t) ? 'on' : ''}`}
-                  onClick={() => toggleType(t)}
-                >
-                  {t}
-                </button>
-              ),
-            )}
           </div>
           <svg ref={svgRef}>
             <g ref={gRef} />
           </svg>
-          <div className="graph-controls">
-            <button type="button" className="zoom-btn" onClick={() => zoomBy(1.3)} aria-label="Zoom in">
-              +
-            </button>
-            <button type="button" className="zoom-btn" onClick={() => zoomBy(1 / 1.3)} aria-label="Zoom out">
-              −
-            </button>
-            <button type="button" className="zoom-btn fit" onClick={fitToView} aria-label="Fit to view">
-              ⤢
-            </button>
-          </div>
-          <div className="graph-legend">
-            <div className="legend-row">
-              <span className="legend-dot you" /> You
-            </div>
-            <div className="legend-row">
-              <span className="legend-dot person" /> Person
-            </div>
-            <div className="legend-row">
-              <span className="legend-dot company" /> Company
-            </div>
-            <div className="legend-row">
-              <span className="legend-dot entity" /> Deal / entity
-            </div>
-            <div className="legend-row legend-note">Ring = warm contact · thicker = stronger</div>
-          </div>
-          <div className="graph-hint">Scroll to zoom · drag nodes · double-click opens note</div>
+          <div className="graph-hint">Scroll to zoom · click a node · double-click for note</div>
         </div>
         <aside className="side-panel">
           {selected ? (
             <>
               <div>
-                <div className="panel-label">Selected node</div>
+                <div className="panel-label">Selected</div>
                 <h2 className="panel-title">{selected.name}</h2>
                 <div className="panel-type">{NODE_TYPE_LABEL[selected.type]}</div>
                 <p className="panel-body">{selected.summary}</p>
-                {selected.tags.length > 0 && (
-                  <div className="tag-row" style={{ marginTop: '0.75rem' }}>
-                    {selected.tags.map((t) => (
-                      <span key={t} className="tag">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
                 <button
                   type="button"
                   className="btn-primary"
                   style={{ marginTop: '1rem' }}
                   onClick={() => navigate(`/person/${selected.id}`)}
                 >
-                  Open note
+                  Open
                 </button>
                 {selected.type === 'person' && selected.id !== YOU_ID && (
                   <button
                     type="button"
                     className="chip"
                     style={{ marginTop: '0.5rem', width: '100%' }}
-                    onClick={() => navigate(`/paths?to=${selected.id}`)}
+                    onClick={() => navigate(`/?to=${selected.id}`)}
                   >
-                    Find path to {selected.name.split(' ')[0]}
+                    Find path here
                   </button>
                 )}
               </div>
               <div>
-                <div className="panel-label">Relationships</div>
+                <div className="panel-label">Connected to</div>
                 <div className="edge-list">
                   {selectedEdges.map((edge) => {
                     const other = getNode(otherEnd(edge, selected.id))
@@ -424,9 +296,6 @@ export function GraphView() {
                       >
                         <div className="etype">{edge.type}</div>
                         <div className="ename">{other.name}</div>
-                        <div className="eevidence">
-                          strength {(edge.strength * 100).toFixed(0)}% · {edge.evidence[0]?.title}
-                        </div>
                       </div>
                     )
                   })}
@@ -434,7 +303,7 @@ export function GraphView() {
               </div>
             </>
           ) : (
-            <p className="panel-body">Select a node</p>
+            <p className="panel-body">Click a node</p>
           )}
         </aside>
       </div>
