@@ -52,10 +52,15 @@ export function PathFinder() {
 
   const paths = useMemo(() => {
     void version
-    return findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 })
+    return findPaths(targetId, { maxDepth: 5, maxPaths: 8, minStrength: 0.35 })
   }, [targetId, version])
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)
+  const directContact =
+    Boolean(target?.knownByUser) &&
+    paths.length === 1 &&
+    paths[0]?.hops.length === 1 &&
+    paths[0]?.firstHopId === targetId
 
   useDocumentTitle(target ? `Path to ${target.name}` : 'Find path')
 
@@ -84,7 +89,29 @@ export function PathFinder() {
             </select>
           </div>
 
-          {verdict ? (
+          {directContact ? (
+            <div className="verdict">
+              <strong>You already know {target?.name}</strong>
+              <p>No intro needed — open their note or ask them directly.</p>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ width: 'auto' }}
+                  onClick={() => navigate(`/person/${targetId}`)}
+                >
+                  Open note
+                </button>
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => navigate(`/graph?focus=${targetId}`)}
+                >
+                  See graph
+                </button>
+              </div>
+            </div>
+          ) : verdict ? (
             <div className="verdict">
               <strong>Ask {verdict.node.name}</strong>
               <p>Best warm intro to {target?.name}.</p>

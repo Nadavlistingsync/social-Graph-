@@ -17,8 +17,14 @@ describe('findPaths', () => {
   })
 
   it('includes a Sapir branch among strong paths to Trump', () => {
-    const paths = findPaths('donald-trump', { maxDepth: 5, maxPaths: 10, minStrength: 0.35 })
+    const paths = findPaths('donald-trump', { maxDepth: 5, maxPaths: 8, minStrength: 0.35 })
     expect(paths.some((p) => p.nodeIds.includes('tamir-sapir'))).toBe(true)
+  })
+
+  it('returns a direct path when the target is already known', () => {
+    const paths = findPaths('jay-neveloff', { maxDepth: 5, maxPaths: 5, minStrength: 0.35 })
+    expect(paths[0]?.nodeIds).toEqual([YOU_ID, 'jay-neveloff'])
+    expect(paths[0]?.hops).toHaveLength(1)
   })
 
   it('returns empty when target is you', () => {
