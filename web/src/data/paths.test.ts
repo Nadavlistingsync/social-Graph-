@@ -1,6 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { completeOnboarding, getYouId, resetWorkspace } from './graphStore'
+import { saveWarmthOverride } from './preferences'
 import { bestFirstHop, findPaths, getNode } from './paths'
-import { YOU_ID } from './seed'
+
+const YOU_ID = getYouId()
+
+beforeEach(() => {
+  localStorage.clear()
+  resetWorkspace()
+  completeOnboarding('Test User', true)
+  saveWarmthOverride('jay-neveloff', { knownByUser: true, warmth: 0.85 })
+})
 
 describe('findPaths', () => {
   it('finds a path from you to Donald Trump', () => {
@@ -33,7 +43,12 @@ describe('findPaths', () => {
 })
 
 describe('getNode', () => {
-  it('returns seeded node by id', () => {
+  it('returns the user node by id', () => {
+    const node = getNode(YOU_ID)
+    expect(node?.name).toBe('Test User')
+  })
+
+  it('returns seeded demo node by id', () => {
     const node = getNode('jay-neveloff')
     expect(node?.name).toBe('Jay Neveloff')
   })

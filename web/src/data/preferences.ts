@@ -1,3 +1,5 @@
+import { loadWorkspaceState, saveWorkspaceState, type Workspace } from './graphStore'
+
 export type WarmthOverride = { knownByUser: boolean; warmth: number }
 
 const WARMTH_KEY = 'sg-warmth-v1'
@@ -66,8 +68,9 @@ export function collectNotes(): Record<string, string> {
 export function exportUserData(): string {
   return JSON.stringify(
     {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
+      workspace: loadWorkspaceState(),
       warmth: loadWarmthOverrides(),
       awkwardEdges: [...loadAwkwardEdges()],
       notes: collectNotes(),
@@ -81,6 +84,7 @@ export function importUserData(raw: string): { ok: true } | { ok: false; error: 
   try {
     const data = JSON.parse(raw) as {
       version?: number
+      workspace?: Workspace
       warmth?: Record<string, WarmthOverride>
       awkwardEdges?: string[]
       notes?: Record<string, string>
@@ -88,6 +92,7 @@ export function importUserData(raw: string): { ok: true } | { ok: false; error: 
     if (!data || typeof data !== 'object') {
       return { ok: false, error: 'Invalid file format' }
     }
+    if (data.workspace) saveWorkspaceState(data.workspace)
     if (data.warmth) writeJson(WARMTH_KEY, data.warmth)
     if (data.awkwardEdges) writeJson(AWKWARD_KEY, data.awkwardEdges)
     if (data.notes) {

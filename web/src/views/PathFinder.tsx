@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { nodes, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
+import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import type { RankedPath } from '../data/types'
@@ -25,17 +25,19 @@ function ScoreRow({ path }: { path: RankedPath }) {
 }
 
 export function PathFinder() {
-  const { version } = usePreferences()
+  const { version, youId, nodes, profile } = useGraph()
+  const { version: prefVersion } = usePreferences()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
-  const people = useMemo(
-    () => nodes.filter((n) => n.type === 'person' && n.id !== YOU_ID),
-    [],
-  )
+  const people = useMemo(() => {
+    void version
+    return nodes.filter((n) => n.type === 'person' && n.id !== youId)
+  }, [nodes, youId, version])
 
+  const defaultTarget = profile.loadSample ? 'donald-trump' : people[0]?.id ?? ''
   const paramTarget = params.get('to')
   const initial =
-    paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : 'donald-trump'
+    paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : defaultTarget
   const [targetId, setTargetId] = useState(initial)
 
   useEffect(() => {
@@ -47,13 +49,15 @@ export function PathFinder() {
 
   function chooseTarget(id: string) {
     setTargetId(id)
-    setParams(id === 'donald-trump' ? {} : { to: id }, { replace: true })
+    setParams(id === defaultTarget ? {} : { to: id }, { replace: true })
   }
 
   const paths = useMemo(() => {
     void version
+    void prefVersion
+    if (!targetId) return []
     return findPaths(targetId, { maxDepth: 5, maxPaths: 8, minStrength: 0.35 })
-  }, [targetId, version])
+  }, [targetId, version, prefVersion])
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)
   const directContact =
@@ -68,10 +72,21 @@ export function PathFinder() {
     <Shell active="paths">
       <div className="path-layout simple" id="main">
         <div className="path-form">
-          <p className="demo-banner">Illustrative public scaffolding — not verified private access.</p>
+          <p className="demo-banner">
+            {profile.loadSample
+              ? 'Sample public network shown — mark who you actually know.'
+              : 'Your personal graph — add people and mark warmth to find paths.'}
+          </p>
           <h1>Who can get me to…</h1>
           <p className="lede">Pick a target. We’ll show the best person you know to ask.</p>
 
+          {people.length === 0 ? (
+            <div className="verdict">
+              <strong>Add someone first</strong>
+              <p>Use “Add person” in the sidebar to start building your graph.</p>
+            </div>
+          ) : (
+            <>
           <div className="field">
             <label className="field-label" htmlFor="to">
               Target
@@ -160,8 +175,11 @@ export function PathFinder() {
               <p>Mark someone you know who’s closer to the target, or show weak links on the graph.</p>
             </div>
           )}
+            </>
+          )}
         </div>
 
+        {people.length > 0 && (
         <div className="path-results">
           <div className="panel-label">Other paths</div>
           {paths.length === 0 && (
@@ -207,6 +225,7 @@ export function PathFinder() {
             </div>
           ))}
         </div>
+        )}
       </div>
     </Shell>
   )

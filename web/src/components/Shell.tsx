@@ -2,7 +2,9 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { searchNodes } from '../data/paths'
+import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
+import { AddPersonModal } from './GraphModals'
 
 const links = [
   { to: '/', label: 'Find path', id: 'paths' as const },
@@ -14,15 +16,20 @@ export function Shell({
   active,
 }: {
   children: React.ReactNode
-  active: 'graph' | 'person' | 'paths'
+  active: 'graph' | 'person' | 'paths' | 'settings'
 }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
+  const [addOpen, setAddOpen] = useState(false)
   const navigate = useNavigate()
   const importRef = useRef<HTMLInputElement>(null)
+  const { profile, version } = useGraph()
   const { exportData, importData } = usePreferences()
-  const results = useMemo(() => (open && q.trim() ? searchNodes(q).slice(0, 6) : []), [q, open])
+  const results = useMemo(() => {
+    void version
+    return open && q.trim() ? searchNodes(q).slice(0, 6) : []
+  }, [q, open, version])
 
   function pickResult(id: string) {
     navigate(`/person/${id}`)
@@ -45,6 +52,7 @@ export function Shell({
     file.text().then((raw) => {
       const result = importData(raw)
       if (!result.ok) window.alert(result.error)
+      else window.location.reload()
     })
   }
 
@@ -53,7 +61,7 @@ export function Shell({
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">Social Graph</div>
-          <div className="brand-sub">Who can intro me?</div>
+          <div className="brand-sub">{profile.name ? `Hi, ${profile.name.split(' ')[0]}` : 'Who can intro me?'}</div>
         </div>
         <nav className="nav" aria-label="Main">
           {links.map((l) => (
@@ -63,6 +71,12 @@ export function Shell({
           ))}
         </nav>
         <div className="sidebar-footer">
+          <button type="button" className="text-btn" onClick={() => setAddOpen(true)}>
+            + Add person
+          </button>
+          <Link to="/settings" className="text-btn">
+            Settings
+          </Link>
           <button type="button" className="text-btn" onClick={handleExport}>
             Export data
           </button>
@@ -143,13 +157,16 @@ export function Shell({
               </div>
             )}
           </div>
+          <button type="button" className="chip on topbar-add" onClick={() => setAddOpen(true)}>
+            + Add person
+          </button>
         </header>
         <div className="view-body">{children}</div>
         <footer className="app-footer">
-          Illustrative demo data — not verified private access. Your warmth, notes, and awkward-intro
-          flags stay in this browser only.
+          Your graph stays in this browser. Export a backup from Settings before switching devices.
         </footer>
       </div>
+      <AddPersonModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   )
 }

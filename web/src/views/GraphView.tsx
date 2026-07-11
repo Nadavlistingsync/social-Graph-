@@ -11,10 +11,12 @@ import { drag } from 'd3-drag'
 import { zoom, zoomIdentity } from 'd3-zoom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
+import { NODE_TYPE_LABEL } from '../data/seed'
+import { getYouId } from '../data/graphStore'
 import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
+import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
@@ -22,6 +24,7 @@ type SimNode = GraphNode & SimulationNodeDatum
 type SimLink = { source: string | SimNode; target: string | SimNode; edge: GraphEdge }
 
 const WEAK_THRESHOLD = 0.35
+const YOU_ID = getYouId()
 
 function nodeFill(n: GraphNode): string {
   if (n.id === YOU_ID) return 'var(--you)'
@@ -74,7 +77,8 @@ function fitToNodes(
 
 export function GraphView() {
   const navigate = useNavigate()
-  const { version } = usePreferences()
+  const { nodes, edges, version } = useGraph()
+  const { version: prefVersion } = usePreferences()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
@@ -90,12 +94,14 @@ export function GraphView() {
   }, [focusId])
 
   const filteredEdges = useMemo(() => {
+    void version
+    void prefVersion
     return edges.filter((e) => {
       if (e.type === 'weak public mention' && hideWeak) return false
       if (hideWeak && e.strength < WEAK_THRESHOLD) return false
       return true
     })
-  }, [hideWeak])
+  }, [edges, hideWeak, version, prefVersion])
 
   const activeNodeIds = useMemo(() => {
     const ids = new Set<string>()
@@ -110,7 +116,7 @@ export function GraphView() {
 
   const graphNodes = useMemo(
     () => nodes.filter((n) => activeNodeIds.has(n.id)),
-    [activeNodeIds],
+    [nodes, activeNodeIds],
   )
 
   const selected = getNode(selectedId)

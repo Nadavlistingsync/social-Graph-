@@ -1,21 +1,7 @@
 import type { GraphEdge, GraphNode } from './types'
 
-/** Illustrative public-relationship scaffolding for UX demo — not verified private access. */
-export const YOU_ID = 'nadav'
-
-export const nodes: GraphNode[] = [
-  {
-    id: 'nadav',
-    name: 'Nadav Benedek',
-    type: 'person',
-    summary:
-      'You. Seed of the graph. Mark warmth on people you actually know — that is the only reliable first hop.',
-    tags: [],
-    knownByUser: true,
-    warmth: 1,
-    timeline: [{ date: '2024-01', label: 'Started mapping NYC real-estate intro paths' }],
-    privateNotes: 'Goal: warm path into Trump-adjacent NYC real estate operators for podcast / deal flow.',
-  },
+/** Illustrative public-relationship scaffolding — not verified private access. */
+export const demoNodes: GraphNode[] = [
   {
     id: 'jay-neveloff',
     name: 'Jay Neveloff',
@@ -23,13 +9,10 @@ export const nodes: GraphNode[] = [
     summary:
       'Major NYC real estate attorney. High-trust bridge into institutional developers and family offices.',
     tags: ['bridge person', 'power broker'],
-    knownByUser: true,
-    warmth: 0.85,
     timeline: [
       { date: '2019', label: 'Longstanding counsel relationships across NYC development' },
       { date: '2023', label: 'Active in high-profile Manhattan transactions' },
     ],
-    privateNotes: 'Best first ask. Credible, discreet, knows who will take a call.',
   },
   {
     id: 'nyc-re-lawyer-cluster',
@@ -181,25 +164,7 @@ const e = (
   evidence: GraphEdge['evidence'],
 ): GraphEdge => ({ id, source, target, type, strength, recency, explanation, evidence })
 
-export const edges: GraphEdge[] = [
-  e(
-    'e-nadav-jay',
-    'nadav',
-    'jay-neveloff',
-    'partner',
-    0.9,
-    '2024-11-01',
-    'Direct personal relationship — user-marked warm edge.',
-    [
-      {
-        title: 'User-curated relationship',
-        url: '#private',
-        snippet: 'Private: Nadav marks Jay as a known, high-warmth contact.',
-        date: '2024-11-01',
-        quality: 'primary',
-      },
-    ],
-  ),
+export const demoEdges: GraphEdge[] = [
   e(
     'e-jay-counsel',
     'jay-neveloff',

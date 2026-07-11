@@ -1,5 +1,5 @@
 import { loadAwkwardEdges, loadWarmthOverrides } from './preferences'
-import { edges, nodes, YOU_ID } from './seed'
+import { getEdges, getNodes, getYouId } from './graphStore'
 import type { EvidenceQuality, GraphEdge, GraphNode, PathHop, RankedPath } from './types'
 
 const qualityScore: Record<EvidenceQuality, number> = {
@@ -10,7 +10,7 @@ const qualityScore: Record<EvidenceQuality, number> = {
 }
 
 export function getNode(id: string): GraphNode | undefined {
-  const base = nodes.find((n) => n.id === id)
+  const base = getNodes().find((n) => n.id === id)
   if (!base) return undefined
   const override = loadWarmthOverrides()[id]
   if (!override) return base
@@ -18,7 +18,7 @@ export function getNode(id: string): GraphNode | undefined {
 }
 
 export function getEdgesForNode(id: string): GraphEdge[] {
-  return edges.filter((e) => e.source === id || e.target === id)
+  return getEdges().filter((e) => e.source === id || e.target === id)
 }
 
 export function otherEnd(edge: GraphEdge, id: string): string {
@@ -41,13 +41,52 @@ function recencyScore(iso: string): number {
   return 0.2
 }
 
+function implicitKnownEdges(
+  awkwardEdges: Set<string>,
+  minStrength: number,
+): { nodeId: string; edge: GraphEdge }[] {
+  const youId = getYouId()
+  const results: { nodeId: string; edge: GraphEdge }[] = []
+  for (const node of getNodes()) {
+    if (node.id === youId) continue
+    const effective = getNode(node.id)
+    if (!effective?.knownByUser) continue
+    const strength = effective.warmth ?? 0.7
+    if (strength < minStrength) continue
+    const edgeId = `implicit-you-${node.id}`
+    if (awkwardEdges.has(edgeId)) continue
+    results.push({
+      nodeId: node.id,
+      edge: {
+        id: edgeId,
+        source: youId,
+        target: node.id,
+        type: 'partner',
+        strength,
+        recency: new Date().toISOString().slice(0, 10),
+        explanation: 'Someone you marked as known.',
+        evidence: [
+          {
+            title: 'Your warmth',
+            url: '#private',
+            snippet: 'Private — you marked this person as known.',
+            date: new Date().toISOString().slice(0, 10),
+            quality: 'primary',
+          },
+        ],
+      },
+    })
+  }
+  return results
+}
+
 function neighbors(
   id: string,
   allowedTypes: Set<string>,
   minStrength: number,
   awkwardEdges: Set<string>,
 ): { nodeId: string; edge: GraphEdge }[] {
-  return edges
+  const explicit = getEdges()
     .filter(
       (e) =>
         (e.source === id || e.target === id) &&
@@ -56,6 +95,14 @@ function neighbors(
         !awkwardEdges.has(e.id),
     )
     .map((e) => ({ nodeId: otherEnd(e, id), edge: e }))
+
+  if (id !== getYouId()) return explicit
+
+  const implicit = implicitKnownEdges(awkwardEdges, minStrength).filter((hop) =>
+    allowedTypes.has(hop.edge.type),
+  )
+  const seen = new Set(explicit.map((h) => h.nodeId))
+  return [...explicit, ...implicit.filter((h) => !seen.has(h.nodeId))]
 }
 
 /** BFS enumeration of simple paths You → target, capped for MVP. */
@@ -69,11 +116,12 @@ export function findPaths(
     fromId?: string
   } = {},
 ): RankedPath[] {
-  const fromId = opts.fromId ?? YOU_ID
+  const fromId = opts.fromId ?? getYouId()
   const maxDepth = opts.maxDepth ?? 5
   const maxPaths = opts.maxPaths ?? 40
   const minStrength = opts.minStrength ?? 0.15
-  const allowedTypes = new Set(opts.allowedTypes ?? edges.map((e) => e.type))
+  const allEdges = getEdges()
+  const allowedTypes = new Set(opts.allowedTypes ?? allEdges.map((e) => e.type))
   const awkwardEdges = loadAwkwardEdges()
 
   if (fromId === targetId) return []
@@ -170,6 +218,7 @@ export function bestFirstHop(paths: RankedPath[]): { node: GraphNode; path: Rank
 }
 
 export function searchNodes(query: string): GraphNode[] {
+  const nodes = getNodes()
   const q = query.trim().toLowerCase()
   if (!q) return nodes.filter((n) => n.type === 'person')
   return nodes.filter(

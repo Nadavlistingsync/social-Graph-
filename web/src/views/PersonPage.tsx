@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { NODE_TYPE_LABEL, YOU_ID } from '../data/seed'
+import { NODE_TYPE_LABEL } from '../data/seed'
+import { getYouId } from '../data/graphStore'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import { Shell } from '../components/Shell'
+import { AddConnectionModal } from '../components/GraphModals'
+import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+
+const YOU_ID = getYouId()
 
 export function PersonPage() {
   const { id = 'donald-trump' } = useParams()
   const navigate = useNavigate()
+  const { version: graphVersion } = useGraph()
   const { version, getWarmth, setWarmth, isAwkward, setAwkward } = usePreferences()
+  const [connOpen, setConnOpen] = useState(false)
   const node = getNode(id)
   const storageKey = `sg-notes-${id}`
 
@@ -41,17 +48,19 @@ export function PersonPage() {
 
   const rels = useMemo(() => {
     void version
+    void graphVersion
     return node ? getEdgesForNode(node.id) : []
-  }, [node, version])
+  }, [node, version, graphVersion])
 
   const introHint = useMemo(() => {
     void version
+    void graphVersion
     if (!node || node.type !== 'person' || node.id === YOU_ID) return null
     const hint = bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }))
     // Already a direct contact — no intro needed
     if (hint && (hint.node.id === node.id || hint.path.hops.length === 1)) return null
     return hint
-  }, [node, version])
+  }, [node, version, graphVersion])
 
   const warmth = node ? getWarmth(node) : null
 
@@ -171,7 +180,12 @@ export function PersonPage() {
           )}
 
           <section className="note-section">
-            <h2>Relationships</h2>
+            <div className="section-header-row">
+              <h2>Relationships</h2>
+              <button type="button" className="chip" onClick={() => setConnOpen(true)}>
+                + Add connection
+              </button>
+            </div>
             {rels.length === 0 && (
               <div className="empty-state" style={{ padding: '1rem 0' }}>
                 No relationships recorded yet.
@@ -261,6 +275,12 @@ export function PersonPage() {
           )}
         </aside>
       </div>
+      <AddConnectionModal
+        open={connOpen}
+        onClose={() => setConnOpen(false)}
+        fromId={node.id}
+        fromName={node.name}
+      />
     </Shell>
   )
 }
