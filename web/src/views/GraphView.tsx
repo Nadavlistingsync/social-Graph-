@@ -73,7 +73,8 @@ function fitToNodes(
 export function GraphView() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const focusId = params.get('focus') ?? YOU_ID
+  const rawFocusId = params.get('focus')
+  const focusId = rawFocusId && getNode(rawFocusId) ? rawFocusId : YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
   const [hideWeak, setHideWeak] = useState(true)
   const [fitTick, setFitTick] = useState(0)
@@ -83,8 +84,12 @@ export function GraphView() {
   const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
 
   useEffect(() => {
+    if (rawFocusId && rawFocusId !== focusId) {
+      setParams({ focus: focusId }, { replace: true })
+      return
+    }
     setSelectedId(focusId)
-  }, [focusId])
+  }, [focusId, rawFocusId, setParams])
 
   const filteredEdges = useMemo(() => {
     return edges.filter((e) => {
@@ -129,6 +134,10 @@ export function GraphView() {
       pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
     }
   }, [selectedId, hideWeak])
+
+  useEffect(() => {
+    document.title = selected ? `${selected.name} graph | Social Graph` : 'Graph | Social Graph'
+  }, [selected])
 
   useEffect(() => {
     const svgEl = svgRef.current

@@ -36,6 +36,12 @@ export function PathFinder() {
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)
 
+  useEffect(() => {
+    document.title = target
+      ? `Path to ${target.name} | Social Graph`
+      : 'Find path | Social Graph'
+  }, [target])
+
   return (
     <Shell active="paths">
       <div className="path-layout simple">

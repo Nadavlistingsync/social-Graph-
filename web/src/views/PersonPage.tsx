@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { NODE_TYPE_LABEL } from '../data/seed'
+import { NODE_TYPE_LABEL, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import { Shell } from '../components/Shell'
 
@@ -33,6 +33,10 @@ export function PersonPage() {
       /* ignore */
     }
   }, [notes, storageKey])
+
+  useEffect(() => {
+    document.title = node ? `${node.name} | Social Graph` : 'Not found | Social Graph'
+  }, [node])
 
   const rels = useMemo(() => (node ? getEdgesForNode(node.id) : []), [node])
 
@@ -73,7 +77,7 @@ export function PersonPage() {
             </div>
           )}
 
-          {introHint && node.id !== 'nadav' && (
+          {introHint && node.id !== YOU_ID && (
             <section className="note-section">
               <h2>Who to ask</h2>
               <div className="verdict" style={{ marginTop: 0 }}>
@@ -124,9 +128,13 @@ export function PersonPage() {
                       </div>
                       {source && (
                         <div className="citation">
-                          <a href={source.url} target="_blank" rel="noreferrer">
-                            {source.title}
-                          </a>
+                          {source.url.startsWith('#') ? (
+                            <span>{source.title}</span>
+                          ) : (
+                            <a href={source.url} target="_blank" rel="noreferrer">
+                              {source.title}
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
@@ -134,6 +142,20 @@ export function PersonPage() {
                 )
               })}
           </section>
+
+          {node.timeline.length > 0 && (
+            <section className="note-section">
+              <h2>Timeline</h2>
+              <div className="timeline-list">
+                {node.timeline.map((item) => (
+                  <div key={`${item.date}-${item.label}`} className="timeline-item">
+                    <div className="date">{item.date}</div>
+                    <div>{item.label}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="note-section">
             <h2>Your notes</h2>
@@ -150,7 +172,7 @@ export function PersonPage() {
           <button type="button" className="chip" onClick={() => navigate(`/graph?focus=${node.id}`)}>
             Show in graph
           </button>
-          {node.type === 'person' && node.id !== 'nadav' && (
+          {node.type === 'person' && node.id !== YOU_ID && (
             <button
               type="button"
               className="chip on"

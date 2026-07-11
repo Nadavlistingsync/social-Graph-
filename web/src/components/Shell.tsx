@@ -19,6 +19,7 @@ export function Shell({
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const results = useMemo(() => (open && q.trim() ? searchNodes(q).slice(0, 6) : []), [q, open])
+  const hasQuery = q.trim().length > 0
 
   return (
     <div className="app-shell">
@@ -48,23 +49,30 @@ export function Shell({
               onFocus={() => setOpen(true)}
               onBlur={() => setTimeout(() => setOpen(false), 150)}
               aria-label="Search"
+              aria-expanded={open && hasQuery}
+              aria-controls="global-search-results"
             />
-            {open && results.length > 0 && (
-              <div className="search-results">
-                {results.map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onMouseDown={() => {
-                      navigate(`/person/${n.id}`)
-                      setQ('')
-                      setOpen(false)
-                    }}
-                  >
-                    {n.name}
-                    <div className="meta">{NODE_TYPE_LABEL[n.type]}</div>
-                  </button>
-                ))}
+            {open && hasQuery && (
+              <div id="global-search-results" className="search-results" role="listbox">
+                {results.length > 0 ? (
+                  results.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      role="option"
+                      onMouseDown={() => {
+                        navigate(`/person/${n.id}`)
+                        setQ('')
+                        setOpen(false)
+                      }}
+                    >
+                      {n.name}
+                      <div className="meta">{NODE_TYPE_LABEL[n.type]}</div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="search-empty">No people or entities found.</div>
+                )}
               </div>
             )}
           </div>
