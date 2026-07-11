@@ -1,5 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { bestFirstHop, findPaths, searchNodes } from './paths'
+import { saveConnectionPreference } from './preferences'
+
+const storage = new Map<string, string>()
+
+vi.stubGlobal('localStorage', {
+  get length() {
+    return storage.size
+  },
+  clear: () => storage.clear(),
+  getItem: (key: string) => storage.get(key) ?? null,
+  key: (index: number) => [...storage.keys()][index] ?? null,
+  removeItem: (key: string) => storage.delete(key),
+  setItem: (key: string, value: string) => storage.set(key, value),
+})
+
+beforeEach(() => storage.clear())
+afterAll(() => vi.unstubAllGlobals())
 
 describe('findPaths', () => {
   it('ranks a warm, connected first hop for the default target', () => {
@@ -20,6 +37,17 @@ describe('findPaths', () => {
 
   it('returns no path when source and target are identical', () => {
     expect(findPaths('nadav')).toEqual([])
+  })
+
+  it('uses a user-confirmed contact as a direct first hop', () => {
+    saveConnectionPreference('gil-dezer', { known: true, warmth: 0.95 })
+
+    const best = bestFirstHop(
+      findPaths('donald-trump', { maxDepth: 2, maxPaths: 5, minStrength: 0.35 }),
+    )
+
+    expect(best?.node.id).toBe('gil-dezer')
+    expect(best?.path.nodeIds).toEqual(['nadav', 'gil-dezer', 'donald-trump'])
   })
 })
 

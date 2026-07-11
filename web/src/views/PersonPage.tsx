@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
@@ -49,12 +49,11 @@ export function PersonPage() {
     }
   }, [notes, storageKey])
 
-  const rels = useMemo(() => (node ? getEdgesForNode(node.id) : []), [node])
-
-  const introHint = useMemo(() => {
-    if (!node || node.type !== 'person') return null
-    return bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5 }))
-  }, [node, connection])
+  const rels = node ? getEdgesForNode(node.id) : []
+  const introHint =
+    node?.type === 'person'
+      ? bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5 }))
+      : null
 
   function updateConnection(next: ConnectionPreference) {
     if (!node) return
@@ -146,9 +145,13 @@ export function PersonPage() {
                       </div>
                       {source && (
                         <div className="citation">
-                          <a href={source.url} target="_blank" rel="noreferrer">
-                            {source.title}
-                          </a>
+                          {source.url.startsWith('#') ? (
+                            <span>{source.title}</span>
+                          ) : (
+                            <a href={source.url} target="_blank" rel="noreferrer">
+                              {source.title}
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>

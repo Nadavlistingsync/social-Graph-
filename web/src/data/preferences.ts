@@ -25,6 +25,10 @@ function readPreferences(): StoredPreferences {
   }
 }
 
+export function getSavedConnectionPreferences(): StoredPreferences {
+  return readPreferences()
+}
+
 export function getConnectionPreference(node: GraphNode): ConnectionPreference {
   const stored = readPreferences()[node.id]
   if (stored && typeof stored.known === 'boolean' && typeof stored.warmth === 'number') {

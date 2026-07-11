@@ -11,8 +11,8 @@ import { drag } from 'd3-drag'
 import { zoom, zoomIdentity } from 'd3-zoom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
-import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import { NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
+import { findPaths, getEdgesForNode, getGraphEdges, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
 
@@ -82,6 +82,7 @@ export function GraphView() {
   const gRef = useRef<SVGGElement>(null)
   const nodesRef = useRef<SimNode[]>([])
   const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
+  const graphEdges = useMemo(() => getGraphEdges(), [])
 
   useEffect(() => {
     setSelectedId(focusId)
@@ -94,12 +95,12 @@ export function GraphView() {
   }, [requestedFocusId, setParams])
 
   const filteredEdges = useMemo(() => {
-    return edges.filter((e) => {
+    return graphEdges.filter((e) => {
       if (e.type === 'weak public mention' && hideWeak) return false
       if (hideWeak && e.strength < WEAK_THRESHOLD) return false
       return true
     })
-  }, [hideWeak])
+  }, [graphEdges, hideWeak])
 
   const activeNodeIds = useMemo(() => {
     const ids = new Set<string>()

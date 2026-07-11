@@ -1,6 +1,6 @@
 import { edges, nodes, YOU_ID } from './seed'
 import type { EvidenceQuality, GraphEdge, GraphNode, PathHop, RankedPath } from './types'
-import { getConnectionPreference } from './preferences'
+import { getConnectionPreference, getSavedConnectionPreferences } from './preferences'
 
 const qualityScore: Record<EvidenceQuality, number> = {
   primary: 1,
@@ -13,8 +13,45 @@ export function getNode(id: string): GraphNode | undefined {
   return nodes.find((n) => n.id === id)
 }
 
+export function getGraphEdges(): GraphEdge[] {
+  const directNodeIds = new Set(
+    edges
+      .filter((edge) => edge.source === YOU_ID || edge.target === YOU_ID)
+      .map((edge) => otherEnd(edge, YOU_ID)),
+  )
+  const saved = getSavedConnectionPreferences()
+  const personalEdges = nodes
+    .filter(
+      (node) =>
+        node.id !== YOU_ID &&
+        node.type === 'person' &&
+        saved[node.id]?.known === true &&
+        !directNodeIds.has(node.id),
+    )
+    .map<GraphEdge>((node) => ({
+      id: `user-${YOU_ID}-${node.id}`,
+      source: YOU_ID,
+      target: node.id,
+      type: 'partner',
+      strength: Math.max(0.35, saved[node.id].warmth),
+      recency: new Date().toISOString().slice(0, 10),
+      evidence: [
+        {
+          title: 'Private, user-confirmed relationship',
+          url: '#private',
+          snippet: 'You marked this person as a direct contact.',
+          date: new Date().toISOString().slice(0, 10),
+          quality: 'primary',
+        },
+      ],
+      explanation: 'Direct relationship confirmed by you in this browser.',
+    }))
+
+  return [...edges, ...personalEdges]
+}
+
 export function getEdgesForNode(id: string): GraphEdge[] {
-  return edges.filter((e) => e.source === id || e.target === id)
+  return getGraphEdges().filter((e) => e.source === id || e.target === id)
 }
 
 export function otherEnd(edge: GraphEdge, id: string): string {
@@ -42,7 +79,7 @@ function neighbors(
   allowedTypes: Set<string>,
   minStrength: number,
 ): { nodeId: string; edge: GraphEdge }[] {
-  return edges
+  return getGraphEdges()
     .filter(
       (e) =>
         (e.source === id || e.target === id) &&
@@ -67,7 +104,7 @@ export function findPaths(
   const maxDepth = opts.maxDepth ?? 5
   const maxPaths = opts.maxPaths ?? 40
   const minStrength = opts.minStrength ?? 0.15
-  const allowedTypes = new Set(opts.allowedTypes ?? edges.map((e) => e.type))
+  const allowedTypes = new Set(opts.allowedTypes ?? getGraphEdges().map((e) => e.type))
 
   if (fromId === targetId) return []
 
