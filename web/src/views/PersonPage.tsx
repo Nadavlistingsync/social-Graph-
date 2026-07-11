@@ -46,8 +46,11 @@ export function PersonPage() {
 
   const introHint = useMemo(() => {
     void version
-    if (!node || node.type !== 'person') return null
-    return bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5 }))
+    if (!node || node.type !== 'person' || node.id === YOU_ID) return null
+    const hint = bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }))
+    // Already a direct contact — no intro needed
+    if (hint && (hint.node.id === node.id || hint.path.hops.length === 1)) return null
+    return hint
   }, [node, version])
 
   const warmth = node ? getWarmth(node) : null
@@ -64,7 +67,7 @@ export function PersonPage() {
 
   return (
     <Shell active="person">
-      <div className="note-layout simple">
+      <div className="note-layout simple" id="main">
         <article className="note-main">
           <h1 className="note-title">{node.name}</h1>
           <div className="note-meta">
@@ -169,17 +172,28 @@ export function PersonPage() {
 
           <section className="note-section">
             <h2>Relationships</h2>
+            {rels.length === 0 && (
+              <div className="empty-state" style={{ padding: '1rem 0' }}>
+                No relationships recorded yet.
+              </div>
+            )}
             {rels
               .slice()
               .sort((a, b) => b.strength - a.strength)
               .map((edge) => {
                 const other = getNode(otherEnd(edge, node.id))
                 if (!other) return null
-                const source = edge.evidence[0]
                 const awkward = isAwkward(edge.id)
                 return (
                   <div key={edge.id} className={`rel-row ${awkward ? 'awkward' : ''}`}>
-                    <div className="rel-type">{edge.type}</div>
+                    <div className="rel-type">
+                      {edge.type}
+                      <span
+                        className="strength-bar"
+                        style={{ width: `${Math.round(edge.strength * 48)}px` }}
+                        title={`Strength ${Math.round(edge.strength * 100)}`}
+                      />
+                    </div>
                     <div>
                       <button
                         type="button"
@@ -191,13 +205,22 @@ export function PersonPage() {
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
                         {edge.explanation}
                       </div>
-                      {source && (
-                        <div className="citation">
-                          <a href={source.url} target="_blank" rel="noreferrer">
-                            {source.title}
-                          </a>
-                        </div>
-                      )}
+                      {edge.evidence.map((source) => {
+                        const illustrative = source.url.startsWith('#')
+                        return (
+                          <div key={source.title + source.date} className="citation">
+                            {illustrative ? (
+                              <span>
+                                {source.title} <span className="badge-illust">illustrative</span>
+                              </span>
+                            ) : (
+                              <a href={source.url} target="_blank" rel="noreferrer">
+                                {source.title}
+                              </a>
+                            )}
+                          </div>
+                        )
+                      })}
                       <button
                         type="button"
                         className={`chip awkward-toggle ${awkward ? 'on' : ''}`}

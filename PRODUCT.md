@@ -6,16 +6,16 @@ Not a CRM. A small relationship map for warm intros.
 
 ## Three screens
 
-1. **Find path** — pick a target → see who to ask first
-2. **Graph** — look at the network
-3. **Note** — open a person; see why each link exists
+1. **Find path** — pick a target → see who to ask first (with scored alternate paths)
+2. **Graph** — look at the network; strong links by default
+3. **Note** — open a person; see why each link exists; mark warmth / awkward intros
 
 ## Automatic vs manual
 
 | Automatic | Manual |
 |-----------|--------|
-| Public relationships + sources | Who you actually know |
-| Path search | Private notes |
+| Public relationships + sources | Who you actually know (saved locally) |
+| Path search + ranking | Private notes |
 | Link strength from evidence | “This intro is awkward” judgment |
 
 Public structure is automatic. Access is manual. A weak mention is never a warm intro.
@@ -32,4 +32,4 @@ Public structure is automatic. Access is manual. A weak mention is never a warm 
 You → Jay Neveloff → NYC counsel → Witkoff / Kushner / Sapir / Dezer → Trump
 ```
 
-Illustrative data for the UI — not verified private access.
+Illustrative data for the UI — not verified private access. Evidence marked illustrative stays in-app (no fake outbound links).

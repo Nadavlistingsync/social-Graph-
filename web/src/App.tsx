@@ -11,6 +11,9 @@ export default function App() {
     <ErrorBoundary>
       <PreferencesProvider>
         <BrowserRouter>
+          <a href="#main" className="skip-link">
+            Skip to content
+          </a>
           <Routes>
             <Route path="/" element={<PathFinder />} />
             <Route path="/graph" element={<GraphView />} />

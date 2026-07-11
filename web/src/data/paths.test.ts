@@ -16,6 +16,11 @@ describe('findPaths', () => {
     expect(verdict?.node.id).toBe('jay-neveloff')
   })
 
+  it('includes a Sapir branch among strong paths to Trump', () => {
+    const paths = findPaths('donald-trump', { maxDepth: 5, maxPaths: 10, minStrength: 0.35 })
+    expect(paths.some((p) => p.nodeIds.includes('tamir-sapir'))).toBe(true)
+  })
+
   it('returns empty when target is you', () => {
     expect(findPaths(YOU_ID)).toEqual([])
   })

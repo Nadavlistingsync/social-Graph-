@@ -286,9 +286,15 @@ export function GraphView() {
     fitToNodes(svgEl, zoomBehavior, nodesRef.current)
   }, [fitTick])
 
+  useEffect(() => {
+    const onResize = () => setFitTick((n) => n + 1)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   return (
     <Shell active="graph">
-      <div className="graph-layout">
+      <div className="graph-layout" id="main">
         <div className="graph-canvas-wrap">
           <div className="graph-toolbar">
             <button
@@ -337,9 +343,13 @@ export function GraphView() {
               <div>
                 <div className="panel-label">Connected to</div>
                 <div className="edge-list">
+                  {selectedEdges.length === 0 && (
+                    <p className="panel-body">No connections at this filter.</p>
+                  )}
                   {selectedEdges.map((edge) => {
                     const other = getNode(otherEnd(edge, selected.id))
                     if (!other) return null
+                    const evidence = edge.evidence[0]
                     return (
                       <div
                         key={edge.id}
@@ -357,8 +367,17 @@ export function GraphView() {
                         role="button"
                         tabIndex={0}
                       >
-                        <div className="etype">{edge.type}</div>
+                        <div className="etype">
+                          {edge.type} · {Math.round(edge.strength * 100)}
+                        </div>
                         <div className="ename">{other.name}</div>
+                        <div className="eevidence">{edge.explanation}</div>
+                        {evidence && (
+                          <div className="eevidence" style={{ marginTop: 4 }}>
+                            {evidence.title}
+                            {evidence.url.startsWith('#') ? ' · illustrative' : ''}
+                          </div>
+                        )}
                       </div>
                     )
                   })}

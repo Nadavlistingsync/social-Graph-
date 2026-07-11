@@ -5,6 +5,24 @@ import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import type { RankedPath } from '../data/types'
+
+function formatScore(n: number): string {
+  return Math.round(n * 100).toString()
+}
+
+function ScoreRow({ path }: { path: RankedPath }) {
+  const s = path.scores
+  return (
+    <div className="score-row" aria-label="Path scores">
+      <span className="total">Score {formatScore(s.total)}</span>
+      <span>Warmth {formatScore(s.warmth)}</span>
+      <span>Strength {formatScore(s.strength)}</span>
+      <span>Evidence {formatScore(s.credibility)}</span>
+      <span>Recency {formatScore(s.recency)}</span>
+    </div>
+  )
+}
 
 export function PathFinder() {
   const { version } = usePreferences()
@@ -43,8 +61,9 @@ export function PathFinder() {
 
   return (
     <Shell active="paths">
-      <div className="path-layout simple">
+      <div className="path-layout simple" id="main">
         <div className="path-form">
+          <p className="demo-banner">Illustrative public scaffolding — not verified private access.</p>
           <h1>Who can get me to…</h1>
           <p className="lede">Pick a target. We’ll show the best person you know to ask.</p>
 
@@ -69,6 +88,7 @@ export function PathFinder() {
             <div className="verdict">
               <strong>Ask {verdict.node.name}</strong>
               <p>Best warm intro to {target?.name}.</p>
+              <ScoreRow path={verdict.path} />
               <div className="path-chain" style={{ marginTop: '0.85rem' }}>
                 {verdict.path.nodeIds.map((nid, i) => {
                   const n = getNode(nid)
@@ -86,6 +106,9 @@ export function PathFinder() {
                   )
                 })}
               </div>
+              <p className="path-rationale" style={{ marginTop: '0.65rem' }}>
+                {verdict.path.rationale}
+              </p>
               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
@@ -107,15 +130,31 @@ export function PathFinder() {
           ) : (
             <div className="verdict">
               <strong>No path found</strong>
-              <p>Add someone you know who’s closer to the target.</p>
+              <p>Mark someone you know who’s closer to the target, or show weak links on the graph.</p>
             </div>
           )}
         </div>
 
         <div className="path-results">
           <div className="panel-label">Other paths</div>
+          {paths.length === 0 && (
+            <div className="empty-state">No strong path to {target?.name ?? 'this person'} yet.</div>
+          )}
+          {paths.length === 1 && (
+            <div className="empty-state">Only one strong path right now.</div>
+          )}
           {paths.slice(1).map((path, idx) => (
-            <div key={path.id} className="path-card" style={{ animationDelay: `${idx * 0.04}s` }}>
+            <div
+              key={path.id}
+              className="path-card"
+              style={{ animationDelay: `${idx * 0.04}s` }}
+              onClick={() => navigate(`/person/${path.firstHopId}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') navigate(`/person/${path.firstHopId}`)
+              }}
+              role="button"
+              tabIndex={0}
+            >
               <div className="path-chain">
                 {path.nodeIds.map((nid, i) => {
                   const n = getNode(nid)
@@ -125,7 +164,10 @@ export function PathFinder() {
                       <button
                         type="button"
                         className="node-pill"
-                        onClick={() => navigate(`/person/${nid}`)}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          navigate(`/person/${nid}`)
+                        }}
                       >
                         {n?.name ?? nid}
                       </button>
@@ -133,12 +175,10 @@ export function PathFinder() {
                   )
                 })}
               </div>
+              <ScoreRow path={path} />
               <div className="path-rationale">{path.rationale}</div>
             </div>
           ))}
-          {paths.length <= 1 && (
-            <div className="empty-state">Only one strong path right now.</div>
-          )}
         </div>
       </div>
     </Shell>

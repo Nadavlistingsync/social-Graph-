@@ -211,7 +211,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'NYC Real Estate Counsel Directory (illustrative)',
-        url: 'https://example.com/nyc-counsel',
+        url: '#illustrative',
         snippet: 'Listed among counsel active on institutional Manhattan closings.',
         date: '2023-09-15',
         quality: 'directory',
@@ -229,7 +229,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Trade press: counsel on Witkoff closing',
-        url: 'https://example.com/witkoff-counsel',
+        url: '#illustrative',
         snippet: 'Outside counsel from the Manhattan RE bar credited on closing.',
         date: '2022-04-01',
         quality: 'news',
@@ -247,7 +247,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Deal counsel mention — Kushner orbit',
-        url: 'https://example.com/kushner-counsel',
+        url: '#illustrative',
         snippet: 'Counsel named in coverage of Midtown financing / sale process.',
         date: '2021-11-01',
         quality: 'news',
@@ -265,7 +265,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Historical closing notice',
-        url: 'https://example.com/sapir-counsel',
+        url: '#illustrative',
         snippet: 'Counsel referenced on Sapir-linked Manhattan deal.',
         date: '2018-06-01',
         quality: 'news',
@@ -283,7 +283,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Condo project counsel listing',
-        url: 'https://example.com/dezer-counsel',
+        url: '#illustrative',
         snippet: 'Legal counsel listed on offering / closing materials (illustrative).',
         date: '2019-03-01',
         quality: 'directory',
@@ -301,7 +301,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Witkoff firm profile',
-        url: 'https://example.com/witkoff',
+        url: '#illustrative',
         snippet: 'Steve Witkoff identified as founder of the firm.',
         date: '2024-01-01',
         quality: 'primary',
@@ -319,7 +319,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Kushner Companies leadership',
-        url: 'https://example.com/kushner-companies',
+        url: '#illustrative',
         snippet: 'Jared Kushner associated with firm leadership in public bios.',
         date: '2020-01-01',
         quality: 'primary',
@@ -337,7 +337,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Coverage of 666 Fifth acquisition',
-        url: 'https://example.com/666-fifth',
+        url: '#illustrative',
         snippet: 'Kushner Companies purchased 666 Fifth Avenue (widely reported).',
         date: '2007-01-01',
         quality: 'news',
@@ -355,7 +355,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Sapir Organization history',
-        url: 'https://example.com/sapir',
+        url: '#illustrative',
         snippet: 'Tamir Sapir founded the organization.',
         date: '2014-01-01',
         quality: 'primary',
@@ -373,7 +373,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Dezer Development profile',
-        url: 'https://example.com/dezer',
+        url: '#illustrative',
         snippet: 'Gil Dezer identified as development principal.',
         date: '2020-01-01',
         quality: 'primary',
@@ -391,7 +391,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Trump-branded condo partnerships',
-        url: 'https://example.com/dezer-trump',
+        url: '#illustrative',
         snippet: 'Dezer projects used Trump branding under licensing / partnership arrangements.',
         date: '2010-06-01',
         quality: 'news',
@@ -409,7 +409,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Public political coverage',
-        url: 'https://example.com/witkoff-trump',
+        url: '#illustrative',
         snippet: 'Extensive public reporting on Witkoff–Trump political relationship.',
         date: '2024-11-15',
         quality: 'news',
@@ -427,7 +427,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Family relationship (public record)',
-        url: 'https://example.com/kushner-trump-family',
+        url: '#illustrative',
         snippet: 'Married to Ivanka Trump; immediate family adjacency.',
         date: '2024-01-01',
         quality: 'primary',
@@ -445,7 +445,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Family relationship (public record)',
-        url: 'https://example.com/ivanka-trump-family',
+        url: '#illustrative',
         snippet: 'Immediate family.',
         date: '2024-01-01',
         quality: 'primary',
@@ -463,7 +463,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Marriage (public record)',
-        url: 'https://example.com/jared-ivanka',
+        url: '#illustrative',
         snippet: 'Married.',
         date: '2024-01-01',
         quality: 'primary',
@@ -481,7 +481,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Trump Organization',
-        url: 'https://example.com/trump-org',
+        url: '#illustrative',
         snippet: 'Longtime principal of the family business.',
         date: '2024-01-01',
         quality: 'primary',
@@ -499,7 +499,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Project branding agreements',
-        url: 'https://example.com/dezer-trump-org',
+        url: '#illustrative',
         snippet: 'Trump Organization licensing on Dezer projects (reported).',
         date: '2012-01-01',
         quality: 'news',
@@ -517,7 +517,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Episode: Counsel at the Closing Table',
-        url: 'https://example.com/podcast-jay',
+        url: '#illustrative',
         snippet: 'Jay Neveloff appears as guest.',
         date: '2023-02-01',
         quality: 'primary',
@@ -535,7 +535,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'NYC Development Web',
-        url: 'https://example.com/article-nyc-web',
+        url: '#illustrative',
         snippet: 'Witkoff mentioned alongside other principals; no direct partnership claimed.',
         date: '2023-06-01',
         quality: 'weak',
@@ -553,7 +553,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'NYC Development Web',
-        url: 'https://example.com/article-nyc-web',
+        url: '#illustrative',
         snippet: 'Sapir Organization listed in panorama of Midtown players.',
         date: '2023-06-01',
         quality: 'weak',
@@ -571,7 +571,7 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Closing counsel credit',
-        url: 'https://example.com/deal-counsel',
+        url: '#illustrative',
         snippet: 'Neveloff credited as counsel on the transaction.',
         date: '2021-08-01',
         quality: 'primary',
@@ -589,9 +589,28 @@ export const edges: GraphEdge[] = [
     [
       {
         title: 'Deal announcement',
-        url: 'https://example.com/deal-witkoff',
+        url: '#illustrative',
         snippet: 'Witkoff named on the Midtown tower recap.',
         date: '2021-08-01',
+        quality: 'news',
+      },
+    ],
+  ),
+  e(
+    'e-sapir-trump',
+    'tamir-sapir',
+    'donald-trump',
+    'partner',
+    0.58,
+    '2007-01-01',
+    'Historical public association via Manhattan development / Trump SoHo-era coverage — illustrative demo edge.',
+    [
+      {
+        title: 'Illustrative: Trump SoHo / Sapir public coverage',
+        url: '#illustrative',
+        snippet:
+          'Demo scaffold: Sapir Organization publicly associated with Trump-branded Manhattan projects in contemporary reporting. Not verified private access.',
+        date: '2007-01-01',
         quality: 'news',
       },
     ],
@@ -606,8 +625,8 @@ export const edges: GraphEdge[] = [
     'Occasional co-mention in NYC developer roundups — not a strong edge.',
     [
       {
-        title: 'Developer roundup',
-        url: 'https://example.com/sapir-trump-mention',
+        title: 'Illustrative: developer roundup',
+        url: '#illustrative',
         snippet: 'Both firms listed among Manhattan developers; no partnership asserted.',
         date: '2015-01-01',
         quality: 'weak',
