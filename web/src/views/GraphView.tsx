@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
 import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
+import { getContactPreference, useContactVersion } from '../data/userState'
 import { Shell } from '../components/Shell'
 
 type SimNode = GraphNode & SimulationNodeDatum
@@ -30,7 +31,7 @@ function nodeFill(n: GraphNode): string {
 
 function nodeRadius(n: GraphNode): number {
   if (n.id === YOU_ID) return 14
-  if (n.type === 'person') return n.knownByUser ? 11 : 9
+  if (n.type === 'person') return getContactPreference(n.id).knownByUser ? 11 : 9
   return 7
 }
 
@@ -73,7 +74,9 @@ function fitToNodes(
 export function GraphView() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const focusId = params.get('focus') ?? YOU_ID
+  const contactVersion = useContactVersion()
+  const focusParam = params.get('focus')
+  const focusId = focusParam && getNode(focusParam) ? focusParam : YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
   const [hideWeak, setHideWeak] = useState(true)
   const [fitTick, setFitTick] = useState(0)
@@ -84,7 +87,12 @@ export function GraphView() {
 
   useEffect(() => {
     setSelectedId(focusId)
-  }, [focusId])
+    if (focusParam && focusParam !== focusId) setParams({}, { replace: true })
+  }, [focusId, focusParam, setParams])
+
+  useEffect(() => {
+    document.title = 'Relationship graph · Social Graph'
+  }, [])
 
   const filteredEdges = useMemo(() => {
     return edges.filter((e) => {
@@ -128,7 +136,7 @@ export function GraphView() {
       pathNodeIds: new Set(paths[0].nodeIds),
       pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
     }
-  }, [selectedId, hideWeak])
+  }, [selectedId, hideWeak, contactVersion])
 
   useEffect(() => {
     const svgEl = svgRef.current
@@ -189,6 +197,9 @@ export function GraphView() {
       .data(simNodes)
       .join('g')
       .attr('cursor', 'pointer')
+      .attr('role', 'button')
+      .attr('tabindex', 0)
+      .attr('aria-label', (d) => `Select ${d.name}`)
       .call(
         drag<SVGGElement, SimNode>()
           .on('start', (event, d) => {
@@ -241,6 +252,14 @@ export function GraphView() {
     nodeG.on('dblclick', (event, d) => {
       event.stopPropagation()
       navigate(`/person/${d.id}`)
+    })
+
+    nodeG.on('keydown', (event: KeyboardEvent, d) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        setSelectedId(d.id)
+        setParams({ focus: d.id })
+      }
     })
 
     simulation.on('tick', () => {
@@ -296,10 +315,14 @@ export function GraphView() {
               Fit
             </button>
           </div>
-          <svg ref={svgRef} role="img" aria-label="Relationship graph">
+          <svg
+            ref={svgRef}
+            role="group"
+            aria-label="Relationship graph. Select a node with the mouse, Enter, or Space."
+          >
             <g ref={gRef} />
           </svg>
-          <div className="graph-hint">Scroll to zoom · click a node · double-click for note</div>
+          <div className="graph-hint">Scroll to zoom · click or press Enter on a node · double-click for note</div>
         </div>
         <aside className="side-panel">
           {selected ? (
@@ -343,7 +366,8 @@ export function GraphView() {
                           setParams({ focus: other.id })
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
                             setSelectedId(other.id)
                             setParams({ focus: other.id })
                           }

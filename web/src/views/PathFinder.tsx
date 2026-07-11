@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { nodes, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
+import { useContactVersion } from '../data/userState'
 import { Shell } from '../components/Shell'
 
 export function PathFinder() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const contactVersion = useContactVersion()
   const people = useMemo(
     () => nodes.filter((n) => n.type === 'person' && n.id !== YOU_ID),
     [],
@@ -22,7 +24,14 @@ export function PathFinder() {
     if (next && people.some((p) => p.id === next) && next !== targetId) {
       setTargetId(next)
     }
-  }, [params, people, targetId])
+    if (next && !people.some((p) => p.id === next)) {
+      setParams({}, { replace: true })
+    }
+  }, [params, people, setParams, targetId])
+
+  useEffect(() => {
+    document.title = 'Find a warm introduction · Social Graph'
+  }, [])
 
   function chooseTarget(id: string) {
     setTargetId(id)
@@ -31,7 +40,7 @@ export function PathFinder() {
 
   const paths = useMemo(
     () => findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }),
-    [targetId],
+    [targetId, contactVersion],
   )
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)

@@ -3,6 +3,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { GraphView } from './views/GraphView'
 import { PersonPage } from './views/PersonPage'
 import { PathFinder } from './views/PathFinder'
+import { NotFound } from './views/NotFound'
 
 export default function App() {
   return (
@@ -13,7 +14,7 @@ export default function App() {
           <Route path="/graph" element={<GraphView />} />
           <Route path="/person/:id" element={<PersonPage />} />
           <Route path="/paths" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

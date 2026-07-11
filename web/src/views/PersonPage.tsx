@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { NODE_TYPE_LABEL } from '../data/seed'
+import { NODE_TYPE_LABEL, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import { setContactPreference, useContactPreference } from '../data/userState'
 import { Shell } from '../components/Shell'
 
 export function PersonPage() {
@@ -9,6 +10,7 @@ export function PersonPage() {
   const navigate = useNavigate()
   const node = getNode(id)
   const storageKey = `sg-notes-${id}`
+  const contact = useContactPreference(id)
 
   const [notes, setNotes] = useState(() => {
     try {
@@ -34,6 +36,10 @@ export function PersonPage() {
     }
   }, [notes, storageKey])
 
+  useEffect(() => {
+    document.title = node ? `${node.name} · Social Graph` : 'Not found · Social Graph'
+  }, [node])
+
   const rels = useMemo(() => (node ? getEdgesForNode(node.id) : []), [node])
 
   const introHint = useMemo(() => {
@@ -58,7 +64,7 @@ export function PersonPage() {
           <h1 className="note-title">{node.name}</h1>
           <div className="note-meta">
             {NODE_TYPE_LABEL[node.type]}
-            {node.knownByUser ? ' · you know them' : ''}
+            {contact.knownByUser ? ' · you know them' : ''}
           </div>
 
           <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{node.summary}</p>
@@ -73,7 +79,7 @@ export function PersonPage() {
             </div>
           )}
 
-          {introHint && node.id !== 'nadav' && (
+          {introHint && node.id !== YOU_ID && (
             <section className="note-section">
               <h2>Who to ask</h2>
               <div className="verdict" style={{ marginTop: 0 }}>
@@ -124,9 +130,13 @@ export function PersonPage() {
                       </div>
                       {source && (
                         <div className="citation">
-                          <a href={source.url} target="_blank" rel="noreferrer">
-                            {source.title}
-                          </a>
+                          {source.url.startsWith('https://example.com') || source.url === '#private' ? (
+                            <span>Illustrative record — verify independently</span>
+                          ) : (
+                            <a href={source.url} target="_blank" rel="noreferrer">
+                              {source.title}
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
@@ -135,9 +145,51 @@ export function PersonPage() {
               })}
           </section>
 
+          {node.type === 'person' && node.id !== YOU_ID && (
+            <section className="note-section">
+              <h2>Your relationship</h2>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={contact.knownByUser}
+                  onChange={(event) =>
+                    setContactPreference(node.id, {
+                      ...contact,
+                      knownByUser: event.target.checked,
+                    })
+                  }
+                />
+                I know {node.name}
+              </label>
+              {contact.knownByUser && (
+                <label className="warmth-control" htmlFor="warmth">
+                  <span>Warmth: {Math.round(contact.warmth * 100)}%</span>
+                  <input
+                    id="warmth"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={contact.warmth}
+                    onChange={(event) =>
+                      setContactPreference(node.id, {
+                        ...contact,
+                        warmth: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+              )}
+            </section>
+          )}
+
           <section className="note-section">
             <h2>Your notes</h2>
+            <label className="sr-only" htmlFor="private-notes">
+              Your private notes for {node.name}
+            </label>
             <textarea
+              id="private-notes"
               className="notes-box"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -150,7 +202,7 @@ export function PersonPage() {
           <button type="button" className="chip" onClick={() => navigate(`/graph?focus=${node.id}`)}>
             Show in graph
           </button>
-          {node.type === 'person' && node.id !== 'nadav' && (
+          {node.type === 'person' && node.id !== YOU_ID && (
             <button
               type="button"
               className="chip on"

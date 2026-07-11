@@ -1,5 +1,6 @@
 import { edges, nodes, YOU_ID } from './seed'
 import type { EvidenceQuality, GraphEdge, GraphNode, PathHop, RankedPath } from './types'
+import { getContactPreference } from './userState'
 
 const qualityScore: Record<EvidenceQuality, number> = {
   primary: 1,
@@ -104,7 +105,8 @@ function rankPath(hops: PathHop[], index: number): RankedPath {
   const firstHopId = hops[0].toId
   const firstNode = getNode(firstHopId)
 
-  const warmth = firstNode?.knownByUser ? (firstNode.warmth ?? 0.7) : 0.05
+  const preference = firstNode ? getContactPreference(firstNode.id) : null
+  const warmth = preference?.knownByUser ? preference.warmth : 0.05
   const strength =
     hops.reduce((s, h) => s + h.edge.strength, 0) / hops.length
   const credibility =
