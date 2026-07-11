@@ -4,7 +4,7 @@ Warm-intro map. Frontend-only React + TypeScript + Vite app in `web/`. No backen
 
 ## Cursor Cloud specific instructions
 
-- The app lives entirely in `web/`. Run all `npm` commands from there.
-- Standard commands: `npm run dev`, `npm run build`, `npm run lint`, `npm run preview`.
-- No environment variables or secrets required.
-- Dependencies refresh via startup update script (`npm install` in `web/`).
+- The app lives entirely in `web/`. Prefer `npm run dev` / `npm run build` from repo root (proxies into `web/`), or run the same scripts inside `web/`.
+- Node 20+ (see `.nvmrc`). No environment variables or secrets required.
+- Dependencies: `npm run install:web` or `npm install` inside `web/`.
+- Vercel: Root Directory `web` (recommended) or root `vercel.json` building `web/dist`.

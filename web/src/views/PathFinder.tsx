@@ -1,17 +1,33 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { nodes, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
 
 export function PathFinder() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const people = useMemo(
     () => nodes.filter((n) => n.type === 'person' && n.id !== YOU_ID),
     [],
   )
-  const [targetId, setTargetId] = useState(params.get('to') ?? 'donald-trump')
+
+  const paramTarget = params.get('to')
+  const initial =
+    paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : 'donald-trump'
+  const [targetId, setTargetId] = useState(initial)
+
+  useEffect(() => {
+    const next = params.get('to')
+    if (next && people.some((p) => p.id === next) && next !== targetId) {
+      setTargetId(next)
+    }
+  }, [params, people, targetId])
+
+  function chooseTarget(id: string) {
+    setTargetId(id)
+    setParams(id === 'donald-trump' ? {} : { to: id }, { replace: true })
+  }
 
   const paths = useMemo(
     () => findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }),
@@ -34,7 +50,7 @@ export function PathFinder() {
             <select
               id="to"
               value={targetId}
-              onChange={(e) => setTargetId(e.target.value)}
+              onChange={(e) => chooseTarget(e.target.value)}
             >
               {people.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -47,9 +63,7 @@ export function PathFinder() {
           {verdict ? (
             <div className="verdict">
               <strong>Ask {verdict.node.name}</strong>
-              <p>
-                Best warm intro to {target?.name}.
-              </p>
+              <p>Best warm intro to {target?.name}.</p>
               <div className="path-chain" style={{ marginTop: '0.85rem' }}>
                 {verdict.path.nodeIds.map((nid, i) => {
                   const n = getNode(nid)

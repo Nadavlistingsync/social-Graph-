@@ -2,7 +2,11 @@
 
 ```bash
 npm install
-npm run dev
+npm run dev      # http://localhost:5173
+npm run build
+npm run preview
 ```
 
-Home screen = **Find path**. Graph and person notes are one click away.
+Home = Find path. Graph at `/graph`. Person notes at `/person/:id`.
+
+For Vercel, either set Root Directory to `web`, or use the repo-root `vercel.json`.

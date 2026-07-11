@@ -34,14 +34,53 @@ function nodeRadius(n: GraphNode): number {
   return 7
 }
 
+function fitToNodes(
+  svgEl: SVGSVGElement,
+  zoomBehavior: ReturnType<typeof zoom<SVGSVGElement, unknown>>,
+  simNodes: SimNode[],
+  pad = 48,
+) {
+  if (!simNodes.length) return
+  const width = svgEl.clientWidth || 800
+  const height = svgEl.clientHeight || 600
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const n of simNodes) {
+    const x = n.x ?? 0
+    const y = n.y ?? 0
+    const r = nodeRadius(n) + 40
+    minX = Math.min(minX, x - r)
+    maxX = Math.max(maxX, x + r)
+    minY = Math.min(minY, y - r)
+    maxY = Math.max(maxY, y + r)
+  }
+  const bw = Math.max(maxX - minX, 1)
+  const bh = Math.max(maxY - minY, 1)
+  const scale = Math.min(
+    2.2,
+    Math.max(0.35, Math.min((width - pad * 2) / bw, (height - pad * 2) / bh)),
+  )
+  const tx = width / 2 - scale * ((minX + maxX) / 2)
+  const ty = height / 2 - scale * ((minY + maxY) / 2)
+  select(svgEl).call(
+    zoomBehavior.transform as never,
+    zoomIdentity.translate(tx, ty).scale(scale),
+  )
+}
+
 export function GraphView() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
   const [hideWeak, setHideWeak] = useState(true)
+  const [fitTick, setFitTick] = useState(0)
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
+  const nodesRef = useRef<SimNode[]>([])
+  const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
 
   useEffect(() => {
     setSelectedId(focusId)
@@ -100,6 +139,7 @@ export function GraphView() {
     const height = svgEl.clientHeight || 600
 
     const simNodes: SimNode[] = graphNodes.map((n) => ({ ...n }))
+    nodesRef.current = simNodes
     const simLinks: SimLink[] = filteredEdges
       .filter((e) => activeNodeIds.has(e.source) && activeNodeIds.has(e.target))
       .map((e) => ({ source: e.source, target: e.target, edge: e }))
@@ -217,14 +257,28 @@ export function GraphView() {
       .on('zoom', (event) => {
         select(gEl).attr('transform', event.transform)
       })
+    zoomRef.current = zoomBehavior
 
     select(svgEl).call(zoomBehavior as never)
     select(svgEl).call(zoomBehavior.transform as never, zoomIdentity)
 
+    simulation.on('end', () => {
+      fitToNodes(svgEl, zoomBehavior, simNodes)
+    })
+
     return () => {
       simulation.stop()
+      zoomRef.current = null
     }
   }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
+
+  useEffect(() => {
+    if (!fitTick) return
+    const svgEl = svgRef.current
+    const zoomBehavior = zoomRef.current
+    if (!svgEl || !zoomBehavior) return
+    fitToNodes(svgEl, zoomBehavior, nodesRef.current)
+  }, [fitTick])
 
   return (
     <Shell active="graph">
@@ -238,8 +292,11 @@ export function GraphView() {
             >
               {hideWeak ? 'Strong links only' : 'Show weak links'}
             </button>
+            <button type="button" className="chip" onClick={() => setFitTick((n) => n + 1)}>
+              Fit
+            </button>
           </div>
-          <svg ref={svgRef}>
+          <svg ref={svgRef} role="img" aria-label="Relationship graph">
             <g ref={gRef} />
           </svg>
           <div className="graph-hint">Scroll to zoom · click a node · double-click for note</div>
