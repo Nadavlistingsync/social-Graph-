@@ -123,7 +123,7 @@ export function GraphView() {
     ? getEdgesForNode(selected.id).filter((e) => !hideWeak || e.strength >= WEAK_THRESHOLD)
     : []
 
-  const { pathNodeIds, pathEdgeIds } = useMemo(() => {
+  const { pathNodeIds, pathEdgeIds } = (() => {
     const empty = { pathNodeIds: new Set<string>(), pathEdgeIds: new Set<string>() }
     if (selectedId === YOU_ID) return empty
     const paths = findPaths(selectedId, {
@@ -136,7 +136,7 @@ export function GraphView() {
       pathNodeIds: new Set(paths[0].nodeIds),
       pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
     }
-  }, [selectedId, hideWeak, contactVersion])
+  })()
 
   useEffect(() => {
     const svgEl = svgRef.current
@@ -289,7 +289,17 @@ export function GraphView() {
       simulation.stop()
       zoomRef.current = null
     }
-  }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
+  }, [
+    graphNodes,
+    filteredEdges,
+    activeNodeIds,
+    selectedId,
+    pathNodeIds,
+    pathEdgeIds,
+    contactVersion,
+    navigate,
+    setParams,
+  ])
 
   useEffect(() => {
     if (!fitTick) return

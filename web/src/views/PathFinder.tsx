@@ -38,10 +38,7 @@ export function PathFinder() {
     setParams(id === 'donald-trump' ? {} : { to: id }, { replace: true })
   }
 
-  const paths = useMemo(
-    () => findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }),
-    [targetId, contactVersion],
-  )
+  const paths = findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 })
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)
 
@@ -116,7 +113,7 @@ export function PathFinder() {
           )}
         </div>
 
-        <div className="path-results">
+        <div className="path-results" data-contact-version={contactVersion}>
           <div className="panel-label">Other paths</div>
           {paths.slice(1).map((path, idx) => (
             <div key={path.id} className="path-card" style={{ animationDelay: `${idx * 0.04}s` }}>

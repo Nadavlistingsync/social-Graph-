@@ -17,11 +17,11 @@ describe('findPaths', () => {
   })
 
   it('returns only simple paths and respects the maximum depth', () => {
-    const paths = findPaths('donald-trump', { maxDepth: 3, maxPaths: 20, minStrength: 0.15 })
+    const paths = findPaths('donald-trump', { maxDepth: 4, maxPaths: 20, minStrength: 0.15 })
 
     expect(paths).not.toHaveLength(0)
     for (const path of paths) {
-      expect(path.hops.length).toBeLessThanOrEqual(3)
+      expect(path.hops.length).toBeLessThanOrEqual(4)
       expect(new Set(path.nodeIds).size).toBe(path.nodeIds.length)
     }
   })
