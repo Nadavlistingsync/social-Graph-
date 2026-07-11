@@ -1,19 +1,43 @@
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useGraph } from '../context/GraphContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 export function Onboarding() {
+  const navigate = useNavigate()
   const { finishOnboarding } = useGraph()
+  const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
   const [loadSample, setLoadSample] = useState(true)
 
-  useDocumentTitle('Welcome')
+  useDocumentTitle(step === 1 ? 'Welcome' : 'Import contacts')
 
-  function submit(e: React.FormEvent) {
+  function startGraph(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
     finishOnboarding(trimmed, loadSample)
+    setStep(2)
+  }
+
+  if (step === 2) {
+    return (
+      <div className="onboarding">
+        <div className="onboarding-card onboarding-wide" id="main">
+          <div className="brand-mark">Social Graph</div>
+          <h1>Who do you know?</h1>
+          <p className="lede">
+            Connect your address book in one tap — same as signing into any app. Gmail, Outlook, or
+            your phone.
+          </p>
+          <ContactAuthPanel showSkip onSkip={() => navigate('/')} compact />
+          <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
+            <Link to="/">Continue to your graph →</Link>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -26,7 +50,7 @@ export function Onboarding() {
           browser — no account required.
         </p>
 
-        <form onSubmit={submit}>
+        <form onSubmit={startGraph}>
           <div className="field">
             <label className="field-label" htmlFor="your-name">
               Your name
@@ -74,7 +98,7 @@ export function Onboarding() {
           </fieldset>
 
           <button type="submit" className="btn-primary" disabled={!name.trim()}>
-            Start your graph
+            Continue
           </button>
         </form>
       </div>

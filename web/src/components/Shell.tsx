@@ -74,7 +74,7 @@ export function Shell({
         </nav>
         <div className="sidebar-footer">
           <button type="button" className="text-btn" onClick={() => setImportOpen(true)}>
-            Import contacts
+            Connect contacts
           </button>
           <button type="button" className="text-btn" onClick={() => setAddOpen(true)}>
             + Add person

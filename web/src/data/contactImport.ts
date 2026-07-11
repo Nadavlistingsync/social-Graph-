@@ -1,4 +1,10 @@
-export type ContactSource = 'vcard' | 'google-csv' | 'outlook-csv' | 'google-api'
+export type ContactSource =
+  | 'vcard'
+  | 'google-csv'
+  | 'outlook-csv'
+  | 'google-api'
+  | 'microsoft-api'
+  | 'device-picker'
 
 export type ParsedContact = {
   name: string
@@ -214,7 +220,11 @@ export function buildContactSummary(c: ParsedContact): string {
   const label =
     c.source === 'google-api'
       ? 'Google Contacts'
-      : c.source === 'google-csv'
+      : c.source === 'microsoft-api'
+        ? 'Microsoft Outlook'
+        : c.source === 'device-picker'
+          ? 'your phone'
+          : c.source === 'google-csv'
         ? 'Google Contacts export'
         : c.source === 'outlook-csv'
           ? 'Outlook export'
@@ -226,6 +236,10 @@ export function sourceLabel(source: ContactSource): string {
   switch (source) {
     case 'google-api':
       return 'Google Contacts'
+    case 'microsoft-api':
+      return 'Microsoft Outlook'
+    case 'device-picker':
+      return 'Device contacts'
     case 'google-csv':
       return 'Google Contacts CSV'
     case 'outlook-csv':

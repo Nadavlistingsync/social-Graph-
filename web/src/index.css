@@ -1185,3 +1185,104 @@ button {
 .import-result {
   padding: 0.5rem 0 1rem;
 }
+
+.onboarding-wide {
+  width: min(520px, 100%);
+}
+
+.contact-auth .auth-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.auth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.auth-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.auth-btn.google {
+  background: #fff;
+  color: #1f1f1f;
+  border-color: #dadce0;
+}
+
+.auth-btn.microsoft {
+  background: #2f2f2f;
+  color: #fff;
+  border-color: #2f2f2f;
+}
+
+.auth-btn.device {
+  background: var(--bg);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.auth-icon {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: 3px;
+}
+
+.auth-btn.google .auth-icon {
+  color: #4285f4;
+}
+
+.auth-btn.microsoft .auth-icon {
+  color: #00a4ef;
+}
+
+.auth-hint {
+  margin: 0.75rem 0 0;
+  text-align: center;
+}
+
+.skip-auth {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.auth-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.75rem;
+}
+
+.auth-status span {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+}
+
+.auth-status span.on {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}

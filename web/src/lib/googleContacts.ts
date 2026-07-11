@@ -1,4 +1,5 @@
 import type { ParsedContact } from '../data/contactImport'
+import { getGoogleClientId } from './oauthConfig'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CONTACTS_SCOPE = 'https://www.googleapis.com/auth/contacts.readonly'
@@ -45,15 +46,6 @@ function loadGoogleScript(): Promise<void> {
     document.head.appendChild(script)
   })
   return gisLoading
-}
-
-export function getGoogleClientId(): string | undefined {
-  const id = import.meta.env.VITE_GOOGLE_CLIENT_ID
-  return typeof id === 'string' && id.trim() ? id.trim() : undefined
-}
-
-export function isGoogleContactsAvailable(): boolean {
-  return Boolean(getGoogleClientId())
 }
 
 function requestAccessToken(clientId: string): Promise<string> {
@@ -120,7 +112,7 @@ function personToContact(person: GooglePerson): ParsedContact | null {
 export async function fetchGoogleContacts(): Promise<ParsedContact[]> {
   const clientId = getGoogleClientId()
   if (!clientId) {
-    throw new Error('Google Contacts is not configured for this deployment.')
+    throw new Error('Google sign-in is not set up yet. Add a Client ID in Settings.')
   }
   const token = await requestAccessToken(clientId)
   const contacts: ParsedContact[] = []

@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shell } from '../components/Shell'
+import { contactAuthStatus } from '../components/ContactAuthPanel'
 import { ImportContactsModal } from '../components/ImportContactsModal'
 import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import {
+  getOAuthUserConfig,
+  saveOAuthUserConfig,
+} from '../lib/oauthConfig'
 
 export function Settings() {
   const { profile, updateProfile, setLoadSample, resetAll } = useGraph()
@@ -12,6 +17,10 @@ export function Settings() {
   const [name, setName] = useState(profile.name)
   const [summary, setSummary] = useState(profile.summary)
   const [importOpen, setImportOpen] = useState(false)
+  const oauth = getOAuthUserConfig()
+  const [googleClientId, setGoogleClientId] = useState(oauth.googleClientId ?? '')
+  const [microsoftClientId, setMicrosoftClientId] = useState(oauth.microsoftClientId ?? '')
+  const authStatus = contactAuthStatus()
 
   useDocumentTitle('Settings')
 
@@ -92,12 +101,65 @@ export function Settings() {
         </section>
 
         <section className="note-section">
+          <h2>Contact sign-in</h2>
+          <p className="section-hint">
+            One-click Google and Microsoft import needs OAuth Client IDs. Your deployer can set env
+            vars, or paste your own below (stored only in this browser).
+          </p>
+          <div className="auth-status">
+            <span className={authStatus.google ? 'on' : ''}>
+              Google {authStatus.google ? 'ready' : 'not configured'}
+            </span>
+            <span className={authStatus.microsoft ? 'on' : ''}>
+              Microsoft {authStatus.microsoft ? 'ready' : 'not configured'}
+            </span>
+            {authStatus.device && <span className="on">Device picker available</span>}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveOAuthUserConfig({
+                googleClientId: googleClientId.trim() || undefined,
+                microsoftClientId: microsoftClientId.trim() || undefined,
+              })
+              window.location.reload()
+            }}
+          >
+            <div className="field">
+              <label className="field-label" htmlFor="google-client-id">
+                Google OAuth Client ID
+              </label>
+              <input
+                id="google-client-id"
+                value={googleClientId}
+                onChange={(e) => setGoogleClientId(e.target.value)}
+                placeholder="….apps.googleusercontent.com"
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="ms-client-id">
+                Microsoft / Azure Client ID
+              </label>
+              <input
+                id="ms-client-id"
+                value={microsoftClientId}
+                onChange={(e) => setMicrosoftClientId(e.target.value)}
+                placeholder="Azure app (application) ID"
+              />
+            </div>
+            <button type="submit" className="chip on">
+              Save sign-in keys
+            </button>
+          </form>
+        </section>
+
+        <section className="note-section">
           <h2>Import contacts</h2>
           <p className="section-hint">
-            Bring in people from Apple Contacts (vCard), Gmail (CSV or Google sign-in), or Outlook.
+            Bring in people from Google, Microsoft Outlook, your phone, or an Apple vCard export.
           </p>
           <button type="button" className="chip on" onClick={() => setImportOpen(true)}>
-            Import from address book
+            Connect address book
           </button>
         </section>
 
