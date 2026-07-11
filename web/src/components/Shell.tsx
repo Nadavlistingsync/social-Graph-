@@ -49,22 +49,26 @@ export function Shell({
               onBlur={() => setTimeout(() => setOpen(false), 150)}
               aria-label="Search"
             />
-            {open && results.length > 0 && (
+            {open && q.trim() && (
               <div className="search-results">
-                {results.map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    onMouseDown={() => {
-                      navigate(`/person/${n.id}`)
-                      setQ('')
-                      setOpen(false)
-                    }}
-                  >
-                    {n.name}
-                    <div className="meta">{NODE_TYPE_LABEL[n.type]}</div>
-                  </button>
-                ))}
+                {results.length > 0 ? (
+                  results.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onMouseDown={() => {
+                        navigate(`/person/${n.id}`)
+                        setQ('')
+                        setOpen(false)
+                      }}
+                    >
+                      {n.name}
+                      <div className="meta">{NODE_TYPE_LABEL[n.type]}</div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="search-empty">No matches for “{q.trim()}”</div>
+                )}
               </div>
             )}
           </div>

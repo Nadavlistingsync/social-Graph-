@@ -6,18 +6,22 @@ import {
   forceSimulation,
   type SimulationNodeDatum,
 } from 'd3-force'
-import { select } from 'd3-selection'
+import { select, type Selection } from 'd3-selection'
 import { drag } from 'd3-drag'
 import { zoom, zoomIdentity } from 'd3-zoom'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
 import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import { isKnown, useKnownVersion } from '../data/userOverrides'
+import { usePageTitle } from '../hooks/usePageTitle'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
 
 type SimNode = GraphNode & SimulationNodeDatum
 type SimLink = { source: string | SimNode; target: string | SimNode; edge: GraphEdge }
+type LinkSelection = Selection<SVGLineElement, SimLink, SVGGElement, unknown>
+type NodeSelection = Selection<SVGGElement, SimNode, SVGGElement, unknown>
 
 const WEAK_THRESHOLD = 0.35
 
@@ -30,7 +34,7 @@ function nodeFill(n: GraphNode): string {
 
 function nodeRadius(n: GraphNode): number {
   if (n.id === YOU_ID) return 14
-  if (n.type === 'person') return n.knownByUser ? 11 : 9
+  if (n.type === 'person') return isKnown(n) ? 11 : 9
   return 7
 }
 
@@ -77,10 +81,15 @@ export function GraphView() {
   const [selectedId, setSelectedId] = useState(focusId)
   const [hideWeak, setHideWeak] = useState(true)
   const [fitTick, setFitTick] = useState(0)
+  const knownVersion = useKnownVersion()
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const nodesRef = useRef<SimNode[]>([])
   const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
+  const linkSelRef = useRef<LinkSelection | null>(null)
+  const nodeSelRef = useRef<NodeSelection | null>(null)
+
+  usePageTitle('Graph')
 
   useEffect(() => {
     setSelectedId(focusId)
@@ -94,20 +103,22 @@ export function GraphView() {
     })
   }, [hideWeak])
 
-  const activeNodeIds = useMemo(() => {
+  const baseNodeIds = useMemo(() => {
     const ids = new Set<string>()
     filteredEdges.forEach((e) => {
       ids.add(e.source)
       ids.add(e.target)
     })
     ids.add(YOU_ID)
-    ids.add(selectedId)
     return ids
-  }, [filteredEdges, selectedId])
+  }, [filteredEdges])
 
+  // Selecting an already-visible node must not rebuild the simulation, so the
+  // node list only changes when the selection falls outside the visible set.
+  const extraId = baseNodeIds.has(selectedId) ? null : selectedId
   const graphNodes = useMemo(
-    () => nodes.filter((n) => activeNodeIds.has(n.id)),
-    [activeNodeIds],
+    () => nodes.filter((n) => baseNodeIds.has(n.id) || n.id === extraId),
+    [baseNodeIds, extraId],
   )
 
   const selected = getNode(selectedId)
@@ -116,6 +127,8 @@ export function GraphView() {
     : []
 
   const { pathNodeIds, pathEdgeIds } = useMemo(() => {
+    // knownVersion invalidates the highlighted path on “I know them” changes.
+    void knownVersion
     const empty = { pathNodeIds: new Set<string>(), pathEdgeIds: new Set<string>() }
     if (selectedId === YOU_ID) return empty
     const paths = findPaths(selectedId, {
@@ -128,8 +141,9 @@ export function GraphView() {
       pathNodeIds: new Set(paths[0].nodeIds),
       pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
     }
-  }, [selectedId, hideWeak])
+  }, [selectedId, hideWeak, knownVersion])
 
+  // Build the force simulation. Runs only when the visible node/edge set changes.
   useEffect(() => {
     const svgEl = svgRef.current
     const gEl = gRef.current
@@ -140,8 +154,9 @@ export function GraphView() {
 
     const simNodes: SimNode[] = graphNodes.map((n) => ({ ...n }))
     nodesRef.current = simNodes
+    const nodeIds = new Set(simNodes.map((n) => n.id))
     const simLinks: SimLink[] = filteredEdges
-      .filter((e) => activeNodeIds.has(e.source) && activeNodeIds.has(e.target))
+      .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
       .map((e) => ({ source: e.source, target: e.target, edge: e }))
 
     const simulation = forceSimulation<SimNode>(simNodes)
@@ -166,22 +181,8 @@ export function GraphView() {
       .append('g')
       .selectAll('line')
       .data(simLinks)
-      .join('line')
-      .attr('stroke', (d) => {
-        if (pathEdgeIds.has(d.edge.id)) return '#c4a35a'
-        return d.edge.strength < WEAK_THRESHOLD
-          ? '#3d4455'
-          : `rgba(154, 149, 140, ${0.25 + d.edge.strength * 0.55})`
-      })
-      .attr('stroke-width', (d) =>
-        pathEdgeIds.has(d.edge.id)
-          ? Math.max(2.5, d.edge.strength * 5)
-          : Math.max(0.6, d.edge.strength * 4.5),
-      )
-      .attr('stroke-opacity', (d) => {
-        if (!pathEdgeIds.size) return d.edge.strength < WEAK_THRESHOLD ? 0.35 : 0.75
-        return pathEdgeIds.has(d.edge.id) ? 0.95 : 0.12
-      })
+      .join('line') as unknown as LinkSelection
+    linkSelRef.current = link
 
     const nodeG = g
       .append('g')
@@ -205,18 +206,13 @@ export function GraphView() {
             d.fx = null
             d.fy = null
           }) as never,
-      )
+      ) as unknown as NodeSelection
+    nodeSelRef.current = nodeG
 
     nodeG
       .append('circle')
-      .attr('r', (d) => nodeRadius(d))
       .attr('fill', (d) => nodeFill(d))
-      .attr('stroke', (d) => (d.id === selectedId ? '#c4a35a' : 'transparent'))
       .attr('stroke-width', 2.5)
-      .attr('opacity', (d) => {
-        if (!pathNodeIds.size) return 1
-        return pathNodeIds.has(d.id) || d.id === selectedId ? 1 : 0.2
-      })
       .attr('class', (d) => (d.id === YOU_ID ? 'node-you' : ''))
 
     nodeG
@@ -227,18 +223,14 @@ export function GraphView() {
       .attr('fill', '#e8e6e3')
       .attr('font-size', 10)
       .attr('font-family', 'IBM Plex Sans, sans-serif')
-      .attr('opacity', (d) => {
-        if (!pathNodeIds.size) return 0.85
-        return pathNodeIds.has(d.id) || d.id === selectedId ? 0.95 : 0.15
-      })
 
-    nodeG.on('click', (event, d) => {
+    nodeG.on('click', (event: MouseEvent, d: SimNode) => {
       event.stopPropagation()
       setSelectedId(d.id)
       setParams({ focus: d.id })
     })
 
-    nodeG.on('dblclick', (event, d) => {
+    nodeG.on('dblclick', (event: MouseEvent, d: SimNode) => {
       event.stopPropagation()
       navigate(`/person/${d.id}`)
     })
@@ -269,8 +261,51 @@ export function GraphView() {
     return () => {
       simulation.stop()
       zoomRef.current = null
+      linkSelRef.current = null
+      nodeSelRef.current = null
     }
-  }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
+  }, [graphNodes, filteredEdges, navigate, setParams])
+
+  // Restyle highlights in place — no simulation restart on selection change.
+  useEffect(() => {
+    const link = linkSelRef.current
+    const nodeG = nodeSelRef.current
+    if (!link || !nodeG) return
+
+    link
+      .attr('stroke', (d) => {
+        if (pathEdgeIds.has(d.edge.id)) return '#c4a35a'
+        return d.edge.strength < WEAK_THRESHOLD
+          ? '#3d4455'
+          : `rgba(154, 149, 140, ${0.25 + d.edge.strength * 0.55})`
+      })
+      .attr('stroke-width', (d) =>
+        pathEdgeIds.has(d.edge.id)
+          ? Math.max(2.5, d.edge.strength * 5)
+          : Math.max(0.6, d.edge.strength * 4.5),
+      )
+      .attr('stroke-opacity', (d) => {
+        if (!pathEdgeIds.size) return d.edge.strength < WEAK_THRESHOLD ? 0.35 : 0.75
+        return pathEdgeIds.has(d.edge.id) ? 0.95 : 0.12
+      })
+
+    nodeG
+      .select('circle')
+      .attr('r', (d) => nodeRadius(d))
+      .attr('stroke', (d) => (d.id === selectedId ? '#c4a35a' : 'transparent'))
+      .attr('opacity', (d) => {
+        if (!pathNodeIds.size) return 1
+        return pathNodeIds.has(d.id) || d.id === selectedId ? 1 : 0.2
+      })
+
+    nodeG
+      .select('text')
+      .attr('x', (d) => nodeRadius(d) + 4)
+      .attr('opacity', (d) => {
+        if (!pathNodeIds.size) return 0.85
+        return pathNodeIds.has(d.id) || d.id === selectedId ? 0.95 : 0.15
+      })
+  }, [selectedId, pathNodeIds, pathEdgeIds, knownVersion, graphNodes, filteredEdges])
 
   useEffect(() => {
     if (!fitTick) return
@@ -299,7 +334,7 @@ export function GraphView() {
           <svg ref={svgRef} role="img" aria-label="Relationship graph">
             <g ref={gRef} />
           </svg>
-          <div className="graph-hint">Scroll to zoom · click a node · double-click for note</div>
+          <div className="graph-hint">Scroll to zoom · click a node · double-click to open</div>
         </div>
         <aside className="side-panel">
           {selected ? (

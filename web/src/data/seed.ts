@@ -3,6 +3,9 @@ import type { GraphEdge, GraphNode } from './types'
 /** Illustrative public-relationship scaffolding for UX demo — not verified private access. */
 export const YOU_ID = 'nadav'
 
+/** Default path-finder target when no `?to=` param is present. */
+export const DEFAULT_TARGET_ID = 'donald-trump'
+
 export const nodes: GraphNode[] = [
   {
     id: 'nadav',
@@ -615,22 +618,6 @@ export const edges: GraphEdge[] = [
     ],
   ),
 ]
-
-export const EDGE_TYPES = [
-  'co-founder',
-  'investor',
-  'family',
-  'board member',
-  'donor',
-  'lawyer',
-  'tenant',
-  'lender',
-  'podcast guest',
-  'political ally',
-  'partner',
-  'competitor',
-  'weak public mention',
-] as const
 
 export const NODE_TYPE_LABEL: Record<GraphNode['type'], string> = {
   person: 'Person',

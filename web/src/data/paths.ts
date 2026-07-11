@@ -1,4 +1,5 @@
 import { edges, nodes, YOU_ID } from './seed'
+import { effectiveWarmth, isKnown } from './userOverrides'
 import type { EvidenceQuality, GraphEdge, GraphNode, PathHop, RankedPath } from './types'
 
 const qualityScore: Record<EvidenceQuality, number> = {
@@ -104,7 +105,7 @@ function rankPath(hops: PathHop[], index: number): RankedPath {
   const firstHopId = hops[0].toId
   const firstNode = getNode(firstHopId)
 
-  const warmth = firstNode?.knownByUser ? (firstNode.warmth ?? 0.7) : 0.05
+  const warmth = firstNode ? effectiveWarmth(firstNode) : 0.05
   const strength =
     hops.reduce((s, h) => s + h.edge.strength, 0) / hops.length
   const credibility =
@@ -142,8 +143,8 @@ function buildRationale(args: {
 }): string {
   const name = args.firstNode?.name ?? 'First hop'
   const parts: string[] = []
-  if (args.warmth >= 0.7) parts.push(`${name} is someone you actually know`)
-  else parts.push(`${name} is a cold first hop — mark warmth if you know them`)
+  if (args.firstNode && isKnown(args.firstNode)) parts.push(`${name} is someone you actually know`)
+  else parts.push(`${name} is a cold first hop — mark “I know them” on their page if you do`)
   if (args.strength >= 0.75) parts.push('edge strength along the path is high')
   if (args.credibility >= 0.7) parts.push('evidence quality is solid')
   else if (args.credibility < 0.45) parts.push('evidence is thin — verify before asking')

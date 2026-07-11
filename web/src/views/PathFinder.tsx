@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { nodes, YOU_ID } from '../data/seed'
+import { DEFAULT_TARGET_ID, nodes, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
+import { useKnownVersion } from '../data/userOverrides'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { Shell } from '../components/Shell'
 
 export function PathFinder() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const knownVersion = useKnownVersion()
   const people = useMemo(
     () => nodes.filter((n) => n.type === 'person' && n.id !== YOU_ID),
     [],
@@ -14,7 +17,7 @@ export function PathFinder() {
 
   const paramTarget = params.get('to')
   const initial =
-    paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : 'donald-trump'
+    paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : DEFAULT_TARGET_ID
   const [targetId, setTargetId] = useState(initial)
 
   useEffect(() => {
@@ -26,13 +29,15 @@ export function PathFinder() {
 
   function chooseTarget(id: string) {
     setTargetId(id)
-    setParams(id === 'donald-trump' ? {} : { to: id }, { replace: true })
+    setParams(id === DEFAULT_TARGET_ID ? {} : { to: id }, { replace: true })
   }
 
-  const paths = useMemo(
-    () => findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }),
-    [targetId],
-  )
+  const paths = useMemo(() => {
+    // knownVersion invalidates rankings when the user toggles “I know them”.
+    void knownVersion
+    return findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 })
+  }, [targetId, knownVersion])
+  usePageTitle('Find path')
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)
 

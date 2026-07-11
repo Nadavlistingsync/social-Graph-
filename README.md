@@ -19,7 +19,17 @@ Open http://localhost:5173
 
 1. **Find path** — pick a target → see who to ask  
 2. **Graph** — explore the network  
-3. **Note** — open anyone; every link has a source  
+3. **Note** — open anyone; every link has a source, a timeline, and an "I know them" toggle  
+
+## Checks
+
+```bash
+npm run lint    # oxlint
+npm test        # vitest unit tests (pathfinding, ranking, overrides)
+npm run build   # tsc -b (strict) + vite build
+```
+
+CI (GitHub Actions) runs lint, tests, and build on every push and PR.
 
 ## Deploy
 

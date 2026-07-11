@@ -15,7 +15,6 @@
   --link-dim: #4a7a88;
   --strong: #d4c4a0;
   --weak: #3d4455;
-  --danger: #c97b6a;
   --tag: #6d8f71;
   --tag-bg: rgba(109, 143, 113, 0.12);
   --you: #c4a35a;
@@ -236,6 +235,13 @@ button {
 
 .search-results .meta {
   font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.search-empty {
+  padding: 0.65rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
   color: var(--text-faint);
 }
 
@@ -551,15 +557,6 @@ button {
   border-color: var(--accent-dim);
 }
 
-.backlink {
-  display: block;
-  padding: 0.4rem 0;
-  font-size: 0.85rem;
-  color: var(--link);
-  cursor: pointer;
-  border-bottom: 1px solid var(--border-soft);
-}
-
 .timeline-item {
   display: grid;
   grid-template-columns: 72px 1fr;
@@ -723,21 +720,6 @@ button {
 .path-chain .node-pill.first {
   border-color: var(--accent-dim);
   color: var(--accent);
-}
-
-.score-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  font-family: var(--font-ui);
-  font-size: 0.7rem;
-  color: var(--text-faint);
-  margin-bottom: 0.4rem;
-}
-
-.score-row .total {
-  color: var(--accent);
-  font-weight: 500;
 }
 
 .path-rationale {

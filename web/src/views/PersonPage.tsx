@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { NODE_TYPE_LABEL } from '../data/seed'
+import { DEFAULT_TARGET_ID, NODE_TYPE_LABEL, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import { isKnown, setKnown, useKnownVersion } from '../data/userOverrides'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { Shell } from '../components/Shell'
 
 export function PersonPage() {
-  const { id = 'donald-trump' } = useParams()
+  const { id = DEFAULT_TARGET_ID } = useParams()
   const navigate = useNavigate()
+  const knownVersion = useKnownVersion()
   const node = getNode(id)
   const storageKey = `sg-notes-${id}`
 
@@ -37,19 +40,27 @@ export function PersonPage() {
   const rels = useMemo(() => (node ? getEdgesForNode(node.id) : []), [node])
 
   const introHint = useMemo(() => {
-    if (!node || node.type !== 'person') return null
+    // knownVersion invalidates the hint when the user toggles “I know them”.
+    void knownVersion
+    if (!node || node.type !== 'person' || node.id === YOU_ID) return null
     return bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5 }))
-  }, [node])
+  }, [node, knownVersion])
+
+  usePageTitle(node?.name)
 
   if (!node) {
     return (
       <Shell active="person">
-        <div className="empty-state">
+        <div className="empty-state" style={{ width: '100%' }}>
           Not found. <Link to="/">Back</Link>
         </div>
       </Shell>
     )
   }
+
+  const known = isKnown(node)
+  const isYou = node.id === YOU_ID
+  const timeline = node.timeline.filter((t) => t.label)
 
   return (
     <Shell active="person">
@@ -58,7 +69,7 @@ export function PersonPage() {
           <h1 className="note-title">{node.name}</h1>
           <div className="note-meta">
             {NODE_TYPE_LABEL[node.type]}
-            {node.knownByUser ? ' · you know them' : ''}
+            {isYou ? ' · this is you' : known ? ' · you know them' : ''}
           </div>
 
           <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{node.summary}</p>
@@ -73,7 +84,7 @@ export function PersonPage() {
             </div>
           )}
 
-          {introHint && node.id !== 'nadav' && (
+          {introHint && (
             <section className="note-section">
               <h2>Who to ask</h2>
               <div className="verdict" style={{ marginTop: 0 }}>
@@ -108,6 +119,7 @@ export function PersonPage() {
                 const other = getNode(otherEnd(edge, node.id))
                 if (!other) return null
                 const source = edge.evidence[0]
+                const isPrivateSource = source ? source.url.startsWith('#') : false
                 return (
                   <div key={edge.id} className="rel-row">
                     <div className="rel-type">{edge.type}</div>
@@ -124,9 +136,13 @@ export function PersonPage() {
                       </div>
                       {source && (
                         <div className="citation">
-                          <a href={source.url} target="_blank" rel="noreferrer">
-                            {source.title}
-                          </a>
+                          {isPrivateSource ? (
+                            <span>{source.title}</span>
+                          ) : (
+                            <a href={source.url} target="_blank" rel="noreferrer">
+                              {source.title}
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
@@ -134,6 +150,18 @@ export function PersonPage() {
                 )
               })}
           </section>
+
+          {timeline.length > 0 && (
+            <section className="note-section">
+              <h2>Timeline</h2>
+              {timeline.map((t) => (
+                <div key={`${t.date}-${t.label}`} className="timeline-item">
+                  <span className="date">{t.date}</span>
+                  <span>{t.label}</span>
+                </div>
+              ))}
+            </section>
+          )}
 
           <section className="note-section">
             <h2>Your notes</h2>
@@ -147,13 +175,24 @@ export function PersonPage() {
         </article>
 
         <aside className="note-aside">
+          {node.type === 'person' && !isYou && (
+            <button
+              type="button"
+              className={`chip ${known ? 'on' : ''}`}
+              style={{ marginBottom: '0.5rem' }}
+              onClick={() => setKnown(node, !known)}
+              aria-pressed={known}
+            >
+              {known ? '✓ I know them' : 'I know them'}
+            </button>
+          )}
           <button type="button" className="chip" onClick={() => navigate(`/graph?focus=${node.id}`)}>
             Show in graph
           </button>
-          {node.type === 'person' && node.id !== 'nadav' && (
+          {node.type === 'person' && !isYou && (
             <button
               type="button"
-              className="chip on"
+              className="chip"
               style={{ marginTop: '0.5rem' }}
               onClick={() => navigate(`/?to=${node.id}`)}
             >
