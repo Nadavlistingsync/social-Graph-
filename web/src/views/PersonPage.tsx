@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { NODE_TYPE_LABEL } from '../data/seed'
+import { NODE_TYPE_LABEL, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import { Shell } from '../components/Shell'
+import { usePreferences } from '../context/PreferencesContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 export function PersonPage() {
   const { id = 'donald-trump' } = useParams()
   const navigate = useNavigate()
+  const { version, getWarmth, setWarmth, isAwkward, setAwkward } = usePreferences()
   const node = getNode(id)
   const storageKey = `sg-notes-${id}`
+
+  useDocumentTitle(node?.name)
 
   const [notes, setNotes] = useState(() => {
     try {
@@ -34,12 +39,18 @@ export function PersonPage() {
     }
   }, [notes, storageKey])
 
-  const rels = useMemo(() => (node ? getEdgesForNode(node.id) : []), [node])
+  const rels = useMemo(() => {
+    void version
+    return node ? getEdgesForNode(node.id) : []
+  }, [node, version])
 
   const introHint = useMemo(() => {
+    void version
     if (!node || node.type !== 'person') return null
     return bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5 }))
-  }, [node])
+  }, [node, version])
+
+  const warmth = node ? getWarmth(node) : null
 
   if (!node) {
     return (
@@ -58,7 +69,7 @@ export function PersonPage() {
           <h1 className="note-title">{node.name}</h1>
           <div className="note-meta">
             {NODE_TYPE_LABEL[node.type]}
-            {node.knownByUser ? ' · you know them' : ''}
+            {warmth?.knownByUser ? ' · you know them' : ''}
           </div>
 
           <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{node.summary}</p>
@@ -73,7 +84,52 @@ export function PersonPage() {
             </div>
           )}
 
-          {introHint && node.id !== 'nadav' && (
+          {node.type === 'person' && node.id !== YOU_ID && warmth && (
+            <section className="note-section">
+              <h2>Your warmth</h2>
+              <p className="section-hint">Only you see this. Path ranking uses it for first-hop scoring.</p>
+              <label className="warmth-toggle">
+                <input
+                  type="checkbox"
+                  checked={warmth.knownByUser}
+                  onChange={(e) => {
+                    const knownByUser = e.target.checked
+                    setWarmth(
+                      node.id,
+                      knownByUser
+                        ? { knownByUser: true, warmth: Math.max(warmth.warmth, 0.7) }
+                        : { knownByUser: false, warmth: 0.2 },
+                    )
+                  }}
+                />
+                I know them
+              </label>
+              {warmth.knownByUser && (
+                <div className="warmth-slider">
+                  <label className="field-label" htmlFor={`warmth-${node.id}`}>
+                    Warmth
+                  </label>
+                  <input
+                    id={`warmth-${node.id}`}
+                    type="range"
+                    min={0.5}
+                    max={1}
+                    step={0.05}
+                    value={warmth.warmth}
+                    onChange={(e) =>
+                      setWarmth(node.id, {
+                        knownByUser: true,
+                        warmth: Number(e.target.value),
+                      })
+                    }
+                  />
+                  <span className="warmth-value">{Math.round(warmth.warmth * 100)}%</span>
+                </div>
+              )}
+            </section>
+          )}
+
+          {introHint && node.id !== YOU_ID && (
             <section className="note-section">
               <h2>Who to ask</h2>
               <div className="verdict" style={{ marginTop: 0 }}>
@@ -99,6 +155,18 @@ export function PersonPage() {
             </section>
           )}
 
+          {node.timeline.length > 0 && (
+            <section className="note-section">
+              <h2>Timeline</h2>
+              {node.timeline.map((item) => (
+                <div key={`${item.date}-${item.label}`} className="timeline-item">
+                  <div className="date">{item.date}</div>
+                  <div>{item.label}</div>
+                </div>
+              ))}
+            </section>
+          )}
+
           <section className="note-section">
             <h2>Relationships</h2>
             {rels
@@ -108,8 +176,9 @@ export function PersonPage() {
                 const other = getNode(otherEnd(edge, node.id))
                 if (!other) return null
                 const source = edge.evidence[0]
+                const awkward = isAwkward(edge.id)
                 return (
-                  <div key={edge.id} className="rel-row">
+                  <div key={edge.id} className={`rel-row ${awkward ? 'awkward' : ''}`}>
                     <div className="rel-type">{edge.type}</div>
                     <div>
                       <button
@@ -129,6 +198,13 @@ export function PersonPage() {
                           </a>
                         </div>
                       )}
+                      <button
+                        type="button"
+                        className={`chip awkward-toggle ${awkward ? 'on' : ''}`}
+                        onClick={() => setAwkward(edge.id, !awkward)}
+                      >
+                        {awkward ? 'Awkward intro — excluded from paths' : 'Mark awkward intro'}
+                      </button>
                     </div>
                   </div>
                 )
@@ -150,7 +226,7 @@ export function PersonPage() {
           <button type="button" className="chip" onClick={() => navigate(`/graph?focus=${node.id}`)}>
             Show in graph
           </button>
-          {node.type === 'person' && node.id !== 'nadav' && (
+          {node.type === 'person' && node.id !== YOU_ID && (
             <button
               type="button"
               className="chip on"

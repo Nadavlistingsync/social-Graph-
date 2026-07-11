@@ -15,6 +15,8 @@ import { edges, NODE_TYPE_LABEL, nodes, YOU_ID } from '../data/seed'
 import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
+import { usePreferences } from '../context/PreferencesContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 type SimNode = GraphNode & SimulationNodeDatum
 type SimLink = { source: string | SimNode; target: string | SimNode; edge: GraphEdge }
@@ -72,6 +74,7 @@ function fitToNodes(
 
 export function GraphView() {
   const navigate = useNavigate()
+  const { version } = usePreferences()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
@@ -115,7 +118,10 @@ export function GraphView() {
     ? getEdgesForNode(selected.id).filter((e) => !hideWeak || e.strength >= WEAK_THRESHOLD)
     : []
 
+  useDocumentTitle('Graph')
+
   const { pathNodeIds, pathEdgeIds } = useMemo(() => {
+    void version
     const empty = { pathNodeIds: new Set<string>(), pathEdgeIds: new Set<string>() }
     if (selectedId === YOU_ID) return empty
     const paths = findPaths(selectedId, {
@@ -128,7 +134,7 @@ export function GraphView() {
       pathNodeIds: new Set(paths[0].nodeIds),
       pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
     }
-  }, [selectedId, hideWeak])
+  }, [selectedId, hideWeak, version])
 
   useEffect(() => {
     const svgEl = svgRef.current

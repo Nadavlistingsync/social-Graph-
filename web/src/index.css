@@ -574,6 +574,109 @@ button {
   color: var(--text-faint);
 }
 
+.section-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.warmth-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+}
+
+.warmth-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  max-width: 280px;
+}
+
+.warmth-slider input[type='range'] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.warmth-value {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.rel-row.awkward {
+  opacity: 0.65;
+}
+
+.awkward-toggle {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.search-results button.highlighted {
+  background: var(--bg-hover);
+}
+
+.search-empty {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  text-align: left;
+  padding: 0.2rem 0;
+  cursor: pointer;
+}
+
+.text-btn:hover {
+  color: var(--link);
+}
+
+.app-footer {
+  border-top: 1px solid var(--border-soft);
+  padding: 0.5rem 1rem;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-dim);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .node-you {
+    animation: none;
+  }
+}
+
 /* Path finder */
 .path-layout {
   display: grid;

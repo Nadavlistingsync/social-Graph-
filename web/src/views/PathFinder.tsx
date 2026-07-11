@@ -3,8 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { nodes, YOU_ID } from '../data/seed'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
+import { usePreferences } from '../context/PreferencesContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 export function PathFinder() {
+  const { version } = usePreferences()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const people = useMemo(
@@ -29,12 +32,14 @@ export function PathFinder() {
     setParams(id === 'donald-trump' ? {} : { to: id }, { replace: true })
   }
 
-  const paths = useMemo(
-    () => findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 }),
-    [targetId],
-  )
+  const paths = useMemo(() => {
+    void version
+    return findPaths(targetId, { maxDepth: 5, maxPaths: 5, minStrength: 0.35 })
+  }, [targetId, version])
   const verdict = bestFirstHop(paths)
   const target = getNode(targetId)
+
+  useDocumentTitle(target ? `Path to ${target.name}` : 'Find path')
 
   return (
     <Shell active="paths">

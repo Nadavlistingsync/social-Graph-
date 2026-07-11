@@ -1,3 +1,4 @@
+import { loadAwkwardEdges, loadWarmthOverrides } from './preferences'
 import { edges, nodes, YOU_ID } from './seed'
 import type { EvidenceQuality, GraphEdge, GraphNode, PathHop, RankedPath } from './types'
 
@@ -9,7 +10,11 @@ const qualityScore: Record<EvidenceQuality, number> = {
 }
 
 export function getNode(id: string): GraphNode | undefined {
-  return nodes.find((n) => n.id === id)
+  const base = nodes.find((n) => n.id === id)
+  if (!base) return undefined
+  const override = loadWarmthOverrides()[id]
+  if (!override) return base
+  return { ...base, knownByUser: override.knownByUser, warmth: override.warmth }
 }
 
 export function getEdgesForNode(id: string): GraphEdge[] {
@@ -40,13 +45,15 @@ function neighbors(
   id: string,
   allowedTypes: Set<string>,
   minStrength: number,
+  awkwardEdges: Set<string>,
 ): { nodeId: string; edge: GraphEdge }[] {
   return edges
     .filter(
       (e) =>
         (e.source === id || e.target === id) &&
         allowedTypes.has(e.type) &&
-        e.strength >= minStrength,
+        e.strength >= minStrength &&
+        !awkwardEdges.has(e.id),
     )
     .map((e) => ({ nodeId: otherEnd(e, id), edge: e }))
 }
@@ -67,6 +74,7 @@ export function findPaths(
   const maxPaths = opts.maxPaths ?? 40
   const minStrength = opts.minStrength ?? 0.15
   const allowedTypes = new Set(opts.allowedTypes ?? edges.map((e) => e.type))
+  const awkwardEdges = loadAwkwardEdges()
 
   if (fromId === targetId) return []
 
@@ -80,7 +88,7 @@ export function findPaths(
     const current = path.length === 0 ? fromId : path[path.length - 1].toId
     if (path.length >= maxDepth) continue
 
-    for (const { nodeId, edge } of neighbors(current, allowedTypes, minStrength)) {
+    for (const { nodeId, edge } of neighbors(current, allowedTypes, minStrength, awkwardEdges)) {
       if (visited.has(nodeId)) continue
       const hop: PathHop = { fromId: current, toId: nodeId, edge }
       const nextPath = [...path, hop]

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#0b0c0e"/>
+  <circle cx="280" cy="315" r="48" fill="#c4a35a" opacity="0.9"/>
+  <circle cx="520" cy="220" r="36" fill="#8fa3b8"/>
+  <circle cx="520" cy="410" r="36" fill="#8fa3b8"/>
+  <circle cx="760" cy="315" r="42" fill="#b8c4d4"/>
+  <circle cx="980" cy="315" r="52" fill="#9a8f7a"/>
+  <line x1="328" y1="315" x2="484" y2="235" stroke="#3d4455" stroke-width="3"/>
+  <line x1="328" y1="315" x2="484" y2="395" stroke="#3d4455" stroke-width="3"/>
+  <line x1="556" y1="235" x2="718" y2="300" stroke="#3d4455" stroke-width="3"/>
+  <line x1="556" y1="395" x2="718" y2="330" stroke="#3d4455" stroke-width="3"/>
+  <line x1="802" y1="315" x2="928" y2="315" stroke="#c4a35a" stroke-width="4"/>
+  <text x="80" y="120" fill="#e8e6e3" font-family="Georgia, serif" font-size="64" font-weight="500">Social Graph</text>
+  <text x="80" y="540" fill="#9a9590" font-family="system-ui, sans-serif" font-size="32">Who do I know who can get me to this person?</text>
+</svg>
