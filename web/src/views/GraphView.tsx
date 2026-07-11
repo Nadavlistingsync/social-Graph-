@@ -6,7 +6,7 @@ import {
   forceSimulation,
   type SimulationNodeDatum,
 } from 'd3-force'
-import { select } from 'd3-selection'
+import { select, type Selection } from 'd3-selection'
 import { drag } from 'd3-drag'
 import { zoom, zoomIdentity } from 'd3-zoom'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -32,6 +32,29 @@ function nodeRadius(n: GraphNode): number {
   if (n.id === YOU_ID) return 14
   if (n.type === 'person') return n.knownByUser ? 11 : 9
   return 7
+}
+
+/**
+ * Keeps the same Set instance across renders when its contents haven't
+ * actually changed. Selecting a node re-adds it to `activeNodeIds`, which
+ * would otherwise produce a new-but-equal Set on every click and force the
+ * whole force-simulation to rebuild (visibly repositioning every node).
+ */
+function useStableIdSet(ids: Iterable<string>): Set<string> {
+  const ref = useRef<Set<string>>(new Set())
+  const next = new Set(ids)
+  const prev = ref.current
+  let same = prev.size === next.size
+  if (same) {
+    for (const id of next) {
+      if (!prev.has(id)) {
+        same = false
+        break
+      }
+    }
+  }
+  if (!same) ref.current = next
+  return ref.current
 }
 
 function fitToNodes(
@@ -81,6 +104,13 @@ export function GraphView() {
   const gRef = useRef<SVGGElement>(null)
   const nodesRef = useRef<SimNode[]>([])
   const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
+  const lastClickRef = useRef<{ id: string; time: number } | null>(null)
+  const linkSelRef = useRef<Selection<SVGLineElement, SimLink, SVGGElement, unknown> | null>(null)
+  const nodeSelRef = useRef<Selection<SVGGElement, SimNode, SVGGElement, unknown> | null>(null)
+  // react-router hands back a new `setParams` function on every render, which
+  // would otherwise force the topology effect below to rebuild on every click.
+  const setParamsRef = useRef(setParams)
+  setParamsRef.current = setParams
 
   useEffect(() => {
     setSelectedId(focusId)
@@ -94,16 +124,18 @@ export function GraphView() {
     })
   }, [hideWeak])
 
-  const activeNodeIds = useMemo(() => {
-    const ids = new Set<string>()
-    filteredEdges.forEach((e) => {
-      ids.add(e.source)
-      ids.add(e.target)
-    })
-    ids.add(YOU_ID)
-    ids.add(selectedId)
-    return ids
-  }, [filteredEdges, selectedId])
+  const activeNodeIds = useStableIdSet(
+    useMemo(() => {
+      const ids = new Set<string>()
+      filteredEdges.forEach((e) => {
+        ids.add(e.source)
+        ids.add(e.target)
+      })
+      ids.add(YOU_ID)
+      ids.add(selectedId)
+      return ids
+    }, [filteredEdges, selectedId]),
+  )
 
   const graphNodes = useMemo(
     () => nodes.filter((n) => activeNodeIds.has(n.id)),
@@ -164,28 +196,14 @@ export function GraphView() {
 
     const link = g
       .append('g')
-      .selectAll('line')
+      .selectAll<SVGLineElement, SimLink>('line')
       .data(simLinks)
       .join('line')
-      .attr('stroke', (d) => {
-        if (pathEdgeIds.has(d.edge.id)) return '#c4a35a'
-        return d.edge.strength < WEAK_THRESHOLD
-          ? '#3d4455'
-          : `rgba(154, 149, 140, ${0.25 + d.edge.strength * 0.55})`
-      })
-      .attr('stroke-width', (d) =>
-        pathEdgeIds.has(d.edge.id)
-          ? Math.max(2.5, d.edge.strength * 5)
-          : Math.max(0.6, d.edge.strength * 4.5),
-      )
-      .attr('stroke-opacity', (d) => {
-        if (!pathEdgeIds.size) return d.edge.strength < WEAK_THRESHOLD ? 0.35 : 0.75
-        return pathEdgeIds.has(d.edge.id) ? 0.95 : 0.12
-      })
+    linkSelRef.current = link
 
     const nodeG = g
       .append('g')
-      .selectAll('g')
+      .selectAll<SVGGElement, SimNode>('g')
       .data(simNodes)
       .join('g')
       .attr('cursor', 'pointer')
@@ -211,12 +229,7 @@ export function GraphView() {
       .append('circle')
       .attr('r', (d) => nodeRadius(d))
       .attr('fill', (d) => nodeFill(d))
-      .attr('stroke', (d) => (d.id === selectedId ? '#c4a35a' : 'transparent'))
       .attr('stroke-width', 2.5)
-      .attr('opacity', (d) => {
-        if (!pathNodeIds.size) return 1
-        return pathNodeIds.has(d.id) || d.id === selectedId ? 1 : 0.2
-      })
       .attr('class', (d) => (d.id === YOU_ID ? 'node-you' : ''))
 
     nodeG
@@ -227,20 +240,25 @@ export function GraphView() {
       .attr('fill', '#e8e6e3')
       .attr('font-size', 10)
       .attr('font-family', 'IBM Plex Sans, sans-serif')
-      .attr('opacity', (d) => {
-        if (!pathNodeIds.size) return 0.85
-        return pathNodeIds.has(d.id) || d.id === selectedId ? 0.95 : 0.15
-      })
 
+    nodeSelRef.current = nodeG
+
+    // Selecting a node updates state, which tears down and rebuilds this whole
+    // simulation — that replaces the DOM node mid-gesture and breaks the
+    // browser's native `dblclick` detection. Detect double-clicks manually
+    // instead, keyed on the same node id within a short window.
     nodeG.on('click', (event, d) => {
       event.stopPropagation()
+      const now = performance.now()
+      const last = lastClickRef.current
+      if (last && last.id === d.id && now - last.time < 400) {
+        lastClickRef.current = null
+        navigate(`/person/${d.id}`)
+        return
+      }
+      lastClickRef.current = { id: d.id, time: now }
       setSelectedId(d.id)
-      setParams({ focus: d.id })
-    })
-
-    nodeG.on('dblclick', (event, d) => {
-      event.stopPropagation()
-      navigate(`/person/${d.id}`)
+      setParamsRef.current({ focus: d.id })
     })
 
     simulation.on('tick', () => {
@@ -269,8 +287,49 @@ export function GraphView() {
     return () => {
       simulation.stop()
       zoomRef.current = null
+      linkSelRef.current = null
+      nodeSelRef.current = null
     }
-  }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
+  }, [graphNodes, filteredEdges, activeNodeIds, navigate])
+
+  // Pure visual updates (selection highlight + best-path glow) — applied to the
+  // existing DOM nodes above instead of rebuilding the simulation, so a click
+  // never moves the node out from under a follow-up click/dblclick.
+  useEffect(() => {
+    const link = linkSelRef.current
+    const nodeG = nodeSelRef.current
+    if (!link || !nodeG) return
+
+    link
+      .attr('stroke', (d) => {
+        if (pathEdgeIds.has(d.edge.id)) return '#c4a35a'
+        return d.edge.strength < WEAK_THRESHOLD
+          ? '#3d4455'
+          : `rgba(154, 149, 140, ${0.25 + d.edge.strength * 0.55})`
+      })
+      .attr('stroke-width', (d) =>
+        pathEdgeIds.has(d.edge.id)
+          ? Math.max(2.5, d.edge.strength * 5)
+          : Math.max(0.6, d.edge.strength * 4.5),
+      )
+      .attr('stroke-opacity', (d) => {
+        if (!pathEdgeIds.size) return d.edge.strength < WEAK_THRESHOLD ? 0.35 : 0.75
+        return pathEdgeIds.has(d.edge.id) ? 0.95 : 0.12
+      })
+
+    nodeG
+      .select('circle')
+      .attr('stroke', (d) => (d.id === selectedId ? '#c4a35a' : 'transparent'))
+      .attr('opacity', (d) => {
+        if (!pathNodeIds.size) return 1
+        return pathNodeIds.has(d.id) || d.id === selectedId ? 1 : 0.2
+      })
+
+    nodeG.select('text').attr('opacity', (d) => {
+      if (!pathNodeIds.size) return 0.85
+      return pathNodeIds.has(d.id) || d.id === selectedId ? 0.95 : 0.15
+    })
+  }, [selectedId, pathNodeIds, pathEdgeIds])
 
   useEffect(() => {
     if (!fitTick) return
