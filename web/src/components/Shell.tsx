@@ -3,9 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { searchNodes } from '../data/paths'
 import { useGraph } from '../context/GraphContext'
+import { useContactImport } from '../context/ContactImportContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { AddPersonModal } from './GraphModals'
-import { ImportContactsModal } from './ImportContactsModal'
 
 const links = [
   { to: '/', label: 'Find path', id: 'paths' as const },
@@ -23,7 +23,7 @@ export function Shell({
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
+  const { openImport } = useContactImport()
   const navigate = useNavigate()
   const importRef = useRef<HTMLInputElement>(null)
   const { profile, version } = useGraph()
@@ -73,7 +73,7 @@ export function Shell({
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button type="button" className="text-btn" onClick={() => setImportOpen(true)}>
+          <button type="button" className="text-btn" onClick={openImport}>
             Connect contacts
           </button>
           <button type="button" className="text-btn" onClick={() => setAddOpen(true)}>
@@ -172,7 +172,6 @@ export function Shell({
         </footer>
       </div>
       <AddPersonModal open={addOpen} onClose={() => setAddOpen(false)} />
-      <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   )
 }

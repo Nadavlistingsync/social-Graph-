@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
 import { GraphView } from './views/GraphView'
@@ -30,12 +31,14 @@ export default function App() {
     <ErrorBoundary>
       <GraphProvider>
         <PreferencesProvider>
-          <BrowserRouter>
-            <a href="#main" className="skip-link">
-              Skip to content
-            </a>
-            <AppRoutes />
-          </BrowserRouter>
+          <ContactImportProvider>
+            <BrowserRouter>
+              <a href="#main" className="skip-link">
+                Skip to content
+              </a>
+              <AppRoutes />
+            </BrowserRouter>
+          </ContactImportProvider>
         </PreferencesProvider>
       </GraphProvider>
     </ErrorBoundary>

@@ -1,15 +1,17 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { detectAndParseContacts } from '../data/contactImport'
 import { useGraph } from '../context/GraphContext'
 import { pickDeviceContacts, isDevicePickerAvailable } from '../lib/deviceContacts'
 import { fetchGoogleContacts } from '../lib/googleContacts'
 import { fetchMicrosoftContacts } from '../lib/microsoftContacts'
+import { isContactsFile, parseContactsFile } from '../lib/launchContacts'
 import {
   getGoogleClientId,
   getMicrosoftClientId,
   isGoogleContactsAvailable,
   isMicrosoftContactsAvailable,
 } from '../lib/oauthConfig'
+import { OAuthSetupSheet } from './OAuthSetupSheet'
 
 type ContactAuthPanelProps = {
   onSuccess?: (imported: number, skipped: number) => void
@@ -29,6 +31,8 @@ export function ContactAuthPanel({
   const [loading, setLoading] = useState<'google' | 'microsoft' | 'device' | 'file' | null>(null)
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null)
+  const [setupProvider, setSetupProvider] = useState<'google' | 'microsoft' | null>(null)
+  const [dragOver, setDragOver] = useState(false)
 
   const googleReady = isGoogleContactsAvailable()
   const microsoftReady = isMicrosoftContactsAvailable()
@@ -42,7 +46,7 @@ export function ContactAuthPanel({
 
   async function runImport(
     source: 'google' | 'microsoft' | 'device',
-    fetcher: () => Promise<ReturnType<typeof detectAndParseContacts>>,
+    fetcher: () => Promise<Awaited<ReturnType<typeof detectAndParseContacts>>>,
   ) {
     setError('')
     setResult(null)
@@ -67,32 +71,59 @@ export function ContactAuthPanel({
     }
   }
 
-  function handleFile(file: File) {
+  function handleGoogle() {
+    if (!googleReady) {
+      setSetupProvider('google')
+      return
+    }
+    void runImport('google', fetchGoogleContacts)
+  }
+
+  function handleMicrosoft() {
+    if (!microsoftReady) {
+      setSetupProvider('microsoft')
+      return
+    }
+    void runImport('microsoft', fetchMicrosoftContacts)
+  }
+
+  async function handleFiles(files: File[]) {
     setError('')
     setResult(null)
     setLoading('file')
-    file
-      .text()
-      .then((raw) => {
-        const contacts = detectAndParseContacts(raw, file.name)
-        if (!contacts.length) {
-          setError('No contacts found in that file.')
-          setLoading(null)
-          return
-        }
+    try {
+      let imported = 0
+      let skipped = 0
+      for (const file of files.filter(isContactsFile)) {
+        const contacts = await parseContactsFile(file)
+        if (!contacts.length) continue
         const res = importContacts(contacts)
-        if (!res.ok) {
-          setError(res.error)
-          setLoading(null)
-          return
+        if (res.ok) {
+          imported += res.imported
+          skipped += res.skipped
         }
-        finish(res.imported, res.skipped)
-      })
-      .catch(() => {
-        setError('Could not read file')
+      }
+      if (!imported) {
+        setError('No contacts found in that file.')
         setLoading(null)
-      })
+        return
+      }
+      finish(imported, skipped)
+    } catch {
+      setError('Could not read file')
+      setLoading(null)
+    }
   }
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      setDragOver(false)
+      void handleFiles([...e.dataTransfer.files])
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [importContacts],
+  )
 
   if (result) {
     return (
@@ -106,13 +137,47 @@ export function ContactAuthPanel({
   }
 
   return (
-    <div className={compact ? 'contact-auth compact' : 'contact-auth'}>
+    <div
+      className={`${compact ? 'contact-auth compact' : 'contact-auth'} ${dragOver ? 'drag-over' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={onDrop}
+    >
+      <div
+        className="drop-zone inline"
+        onClick={() => fileRef.current?.click()}
+        onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
+        role="button"
+        tabIndex={0}
+      >
+        {loading === 'file' ? 'Reading file…' : 'Drop Apple / Gmail export here, or click to browse'}
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".vcf,.csv,text/vcard,text/x-vcard,text/csv"
+        multiple
+        hidden
+        onChange={(e) => {
+          const list = e.target.files ? [...e.target.files] : []
+          if (list.length) void handleFiles(list)
+          e.target.value = ''
+        }}
+      />
+
+      <div className="auth-divider">
+        <span>or sign in</span>
+      </div>
+
       <div className="auth-buttons">
         <button
           type="button"
           className="auth-btn google"
           disabled={Boolean(loading)}
-          onClick={() => runImport('google', fetchGoogleContacts)}
+          onClick={handleGoogle}
         >
           <span className="auth-icon" aria-hidden>
             G
@@ -124,7 +189,7 @@ export function ContactAuthPanel({
           type="button"
           className="auth-btn microsoft"
           disabled={Boolean(loading)}
-          onClick={() => runImport('microsoft', fetchMicrosoftContacts)}
+          onClick={handleMicrosoft}
         >
           <span className="auth-icon" aria-hidden>
             M
@@ -144,51 +209,11 @@ export function ContactAuthPanel({
         )}
       </div>
 
-      {!googleReady || !microsoftReady ? (
-        <p className="section-hint auth-hint">
-          {!googleReady && !microsoftReady
-            ? 'Add Google and/or Microsoft Client IDs in Settings to enable one-click sign-in.'
-            : !googleReady
-              ? 'Add a Google Client ID in Settings to enable Google sign-in.'
-              : 'Add a Microsoft Client ID in Settings to enable Outlook sign-in.'}
-        </p>
-      ) : (
-        <p className="section-hint auth-hint">
-          One tap — we only read names and emails. Nothing leaves your browser except the OAuth
-          request to Google or Microsoft.
-        </p>
-      )}
-
-      <details className="import-help">
-        <summary>Other options (Apple export, CSV)</summary>
-        <button
-          type="button"
-          className="chip"
-          disabled={Boolean(loading)}
-          onClick={() => fileRef.current?.click()}
-        >
-          {loading === 'file' ? 'Reading file…' : 'Upload vCard or CSV'}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".vcf,.csv,text/vcard,text/x-vcard,text/csv"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) handleFile(file)
-            e.target.value = ''
-          }}
-        />
-        <ul>
-          <li>
-            <strong>Apple Contacts:</strong> export vCard on Mac or iCloud.com, then upload here.
-          </li>
-          <li>
-            <strong>Gmail users:</strong> use Continue with Google above (syncs Google Contacts).
-          </li>
-        </ul>
-      </details>
+      <p className="section-hint auth-hint">
+        {googleReady && microsoftReady
+          ? 'One tap — names and emails only. Stays in your browser.'
+          : 'Google / Microsoft need a one-time setup (30 sec) — tap the button and we’ll walk you through it.'}
+      </p>
 
       {error && <p className="form-error">{error}</p>}
 
@@ -197,11 +222,22 @@ export function ContactAuthPanel({
           Skip for now
         </button>
       )}
+
+      {setupProvider && (
+        <OAuthSetupSheet
+          provider={setupProvider}
+          onClose={() => setSetupProvider(null)}
+          onSaved={() => {
+            setSetupProvider(null)
+            if (setupProvider === 'google') handleGoogle()
+            else handleMicrosoft()
+          }}
+        />
+      )}
     </div>
   )
 }
 
-/** For Settings: show which providers are configured */
 export function contactAuthStatus(): { google: boolean; microsoft: boolean; device: boolean } {
   return {
     google: Boolean(getGoogleClientId()),

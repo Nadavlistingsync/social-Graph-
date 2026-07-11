@@ -13,5 +13,16 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "file_handlers": [
+    {
+      "action": "/?import=file",
+      "accept": {
+        "text/vcard": [".vcf"],
+        "text/x-vcard": [".vcf"],
+        "application/vcard": [".vcf"],
+        "text/csv": [".csv"]
+      }
+    }
   ]
 }

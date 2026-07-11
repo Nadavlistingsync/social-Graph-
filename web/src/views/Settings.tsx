@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shell } from '../components/Shell'
 import { contactAuthStatus } from '../components/ContactAuthPanel'
-import { ImportContactsModal } from '../components/ImportContactsModal'
+import { useContactImport } from '../context/ContactImportContext'
 import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -13,10 +13,10 @@ import {
 
 export function Settings() {
   const { profile, updateProfile, setLoadSample, resetAll } = useGraph()
+  const { openImport } = useContactImport()
   const { exportData, importData } = usePreferences()
   const [name, setName] = useState(profile.name)
   const [summary, setSummary] = useState(profile.summary)
-  const [importOpen, setImportOpen] = useState(false)
   const oauth = getOAuthUserConfig()
   const [googleClientId, setGoogleClientId] = useState(oauth.googleClientId ?? '')
   const [microsoftClientId, setMicrosoftClientId] = useState(oauth.microsoftClientId ?? '')
@@ -158,7 +158,7 @@ export function Settings() {
           <p className="section-hint">
             Bring in people from Google, Microsoft Outlook, your phone, or an Apple vCard export.
           </p>
-          <button type="button" className="chip on" onClick={() => setImportOpen(true)}>
+          <button type="button" className="chip on" onClick={openImport}>
             Connect address book
           </button>
         </section>
@@ -211,7 +211,6 @@ export function Settings() {
           <Link to="/">← Back to path finder</Link>
         </p>
       </div>
-      <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} />
     </Shell>
   )
 }
