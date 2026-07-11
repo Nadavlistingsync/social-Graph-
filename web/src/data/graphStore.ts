@@ -1,4 +1,6 @@
 import { demoEdges, demoNodes } from './seed'
+import { importContactsIntoWorkspace, type ContactImportResult } from './contactImportBatch'
+import type { ParsedContact } from './contactImport'
 import type { GraphEdge, GraphNode } from './types'
 
 export const YOU_ID = 'you'
@@ -163,6 +165,19 @@ export function addEdge(edge: GraphEdge): { ok: true } | { ok: false; error: str
   ws.customEdges.push(edge)
   writeWorkspace(ws)
   return { ok: true }
+}
+
+export function importContacts(
+  contacts: ParsedContact[],
+): ({ ok: true } & ContactImportResult) | { ok: false; error: string } {
+  const ws = readWorkspace()
+  if (!ws.profile.onboarded) return { ok: false, error: 'Complete setup first' }
+  if (!contacts.length) return { ok: false, error: 'No contacts found in file' }
+
+  const existingNodes = getNodes()
+  const result = importContactsIntoWorkspace(ws, existingNodes, contacts)
+  writeWorkspace(ws)
+  return { ok: true, ...result }
 }
 
 export function loadWorkspaceState(): Workspace {

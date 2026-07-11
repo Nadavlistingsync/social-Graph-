@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shell } from '../components/Shell'
+import { ImportContactsModal } from '../components/ImportContactsModal'
 import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -10,6 +11,7 @@ export function Settings() {
   const { exportData, importData } = usePreferences()
   const [name, setName] = useState(profile.name)
   const [summary, setSummary] = useState(profile.summary)
+  const [importOpen, setImportOpen] = useState(false)
 
   useDocumentTitle('Settings')
 
@@ -90,6 +92,16 @@ export function Settings() {
         </section>
 
         <section className="note-section">
+          <h2>Import contacts</h2>
+          <p className="section-hint">
+            Bring in people from Apple Contacts (vCard), Gmail (CSV or Google sign-in), or Outlook.
+          </p>
+          <button type="button" className="chip on" onClick={() => setImportOpen(true)}>
+            Import from address book
+          </button>
+        </section>
+
+        <section className="note-section">
           <h2>Backup</h2>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
@@ -137,6 +149,7 @@ export function Settings() {
           <Link to="/">← Back to path finder</Link>
         </p>
       </div>
+      <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} />
     </Shell>
   )
 }

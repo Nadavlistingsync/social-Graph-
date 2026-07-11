@@ -16,6 +16,7 @@ import {
   getNodes,
   getProfile,
   getYouId,
+  importContacts as storeImportContacts,
   isOnboarded,
   migrateLegacyUser,
   resetWorkspace,
@@ -25,6 +26,7 @@ import {
   type WorkspaceProfile,
 } from '../data/graphStore'
 import { saveWarmthOverride } from '../data/preferences'
+import type { ParsedContact } from '../data/contactImport'
 
 type GraphContextValue = {
   version: number
@@ -53,6 +55,11 @@ type GraphContextValue = {
     explanation: string
     strength: number
   }) => { ok: true; id: string } | { ok: false; error: string }
+  importContacts: (
+    contacts: ParsedContact[],
+  ) =>
+    | { ok: true; imported: number; skipped: number }
+    | { ok: false; error: string }
   resetAll: () => void
 }
 
@@ -152,6 +159,15 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         const result = storeAddEdge(edge)
         if (result.ok) bump()
         return result.ok ? { ok: true, id: edgeId } : result
+      },
+      importContacts: (contacts) => {
+        const result = storeImportContacts(contacts)
+        if (!result.ok) return result
+        for (const id of result.warmthIds) {
+          saveWarmthOverride(id, { knownByUser: true, warmth: 0.75 })
+        }
+        bump()
+        return { ok: true, imported: result.imported, skipped: result.skipped }
       },
       resetAll: () => {
         resetWorkspace()
