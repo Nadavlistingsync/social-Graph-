@@ -19,10 +19,15 @@ export function PathFinder() {
 
   useEffect(() => {
     const next = params.get('to')
-    if (next && people.some((p) => p.id === next) && next !== targetId) {
-      setTargetId(next)
+    if (next) {
+      if (people.some((p) => p.id === next)) {
+        if (next !== targetId) setTargetId(next)
+      } else {
+        setTargetId('donald-trump')
+        setParams({}, { replace: true })
+      }
     }
-  }, [params, people, targetId])
+  }, [params, people, setParams, targetId])
 
   function chooseTarget(id: string) {
     setTargetId(id)
@@ -127,6 +132,11 @@ export function PathFinder() {
                     </span>
                   )
                 })}
+              </div>
+              <div className="score-row" aria-label="Path confidence scores">
+                <span className="total">{Math.round(path.scores.total * 100)}% overall</span>
+                <span>{Math.round(path.scores.strength * 100)}% strength</span>
+                <span>{Math.round(path.scores.credibility * 100)}% evidence</span>
               </div>
               <div className="path-rationale">{path.rationale}</div>
             </div>

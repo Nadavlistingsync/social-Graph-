@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import {
+  getConnectionPreference,
+  saveConnectionPreference,
+  type ConnectionPreference,
+} from '../data/preferences'
 import { Shell } from '../components/Shell'
 
 export function PersonPage() {
@@ -9,6 +14,11 @@ export function PersonPage() {
   const navigate = useNavigate()
   const node = getNode(id)
   const storageKey = `sg-notes-${id}`
+  const initialPreference = node
+    ? getConnectionPreference(node)
+    : { known: false, warmth: 0.7 }
+  const [connection, setConnection] = useState<ConnectionPreference>(initialPreference)
+  const [saveError, setSaveError] = useState(false)
 
   const [notes, setNotes] = useState(() => {
     try {
@@ -27,6 +37,11 @@ export function PersonPage() {
   }, [node, storageKey])
 
   useEffect(() => {
+    if (node) setConnection(getConnectionPreference(node))
+    setSaveError(false)
+  }, [node])
+
+  useEffect(() => {
     try {
       localStorage.setItem(storageKey, notes)
     } catch {
@@ -39,7 +54,13 @@ export function PersonPage() {
   const introHint = useMemo(() => {
     if (!node || node.type !== 'person') return null
     return bestFirstHop(findPaths(node.id, { maxDepth: 5, maxPaths: 5 }))
-  }, [node])
+  }, [node, connection])
+
+  function updateConnection(next: ConnectionPreference) {
+    if (!node) return
+    setConnection(next)
+    setSaveError(!saveConnectionPreference(node.id, next))
+  }
 
   if (!node) {
     return (
@@ -58,7 +79,7 @@ export function PersonPage() {
           <h1 className="note-title">{node.name}</h1>
           <div className="note-meta">
             {NODE_TYPE_LABEL[node.type]}
-            {node.knownByUser ? ' · you know them' : ''}
+            {connection.known ? ` · warm contact (${Math.round(connection.warmth * 100)}%)` : ''}
           </div>
 
           <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>{node.summary}</p>
@@ -101,6 +122,7 @@ export function PersonPage() {
 
           <section className="note-section">
             <h2>Relationships</h2>
+            {rels.length === 0 && <div className="empty-inline">No relationships mapped yet.</div>}
             {rels
               .slice()
               .sort((a, b) => b.strength - a.strength)
@@ -135,6 +157,18 @@ export function PersonPage() {
               })}
           </section>
 
+          {node.timeline.length > 0 && (
+            <section className="note-section">
+              <h2>Timeline</h2>
+              {node.timeline.map((item) => (
+                <div key={`${item.date}-${item.label}`} className="timeline-item">
+                  <div className="date">{item.date}</div>
+                  <div>{item.label}</div>
+                </div>
+              ))}
+            </section>
+          )}
+
           <section className="note-section">
             <h2>Your notes</h2>
             <textarea
@@ -147,6 +181,46 @@ export function PersonPage() {
         </article>
 
         <aside className="note-aside">
+          {node.type === 'person' && node.id !== 'nadav' && (
+            <section className="connection-editor" aria-label="Connection settings">
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={connection.known}
+                  onChange={(event) =>
+                    updateConnection({ ...connection, known: event.target.checked })
+                  }
+                />
+                I know this person
+              </label>
+              <label className="warmth-control">
+                <span>
+                  Relationship warmth
+                  <strong>{Math.round(connection.warmth * 100)}%</strong>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={Math.round(connection.warmth * 100)}
+                  disabled={!connection.known}
+                  onChange={(event) =>
+                    updateConnection({
+                      ...connection,
+                      warmth: Number(event.target.value) / 100,
+                    })
+                  }
+                />
+              </label>
+              <p className="editor-help">Saved only in this browser and used to rank intro paths.</p>
+              {saveError && (
+                <p className="save-error" role="alert">
+                  Could not save this setting.
+                </p>
+              )}
+            </section>
+          )}
           <button type="button" className="chip" onClick={() => navigate(`/graph?focus=${node.id}`)}>
             Show in graph
           </button>

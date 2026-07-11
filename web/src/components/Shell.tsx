@@ -19,9 +19,13 @@ export function Shell({
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const results = useMemo(() => (open && q.trim() ? searchNodes(q).slice(0, 6) : []), [q, open])
+  const showResults = open && q.trim().length > 0
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">Social Graph</div>
@@ -29,11 +33,17 @@ export function Shell({
         </div>
         <nav className="nav">
           {links.map((l) => (
-            <Link key={l.to} to={l.to} className={active === l.id ? 'active' : undefined}>
+            <Link
+              key={l.to}
+              to={l.to}
+              className={active === l.id ? 'active' : undefined}
+              aria-current={active === l.id ? 'page' : undefined}
+            >
               {l.label}
             </Link>
           ))}
         </nav>
+        <p className="demo-notice">Illustrative public data. Verify every relationship before acting.</p>
       </aside>
       <div className="main">
         <header className="topbar">
@@ -48,9 +58,11 @@ export function Shell({
               onFocus={() => setOpen(true)}
               onBlur={() => setTimeout(() => setOpen(false), 150)}
               aria-label="Search"
+              aria-expanded={showResults}
+              aria-controls="search-results"
             />
-            {open && results.length > 0 && (
-              <div className="search-results">
+            {showResults && (
+              <div className="search-results" id="search-results">
                 {results.map((n) => (
                   <button
                     key={n.id}
@@ -65,11 +77,14 @@ export function Shell({
                     <div className="meta">{NODE_TYPE_LABEL[n.type]}</div>
                   </button>
                 ))}
+                {results.length === 0 && <div className="search-empty">No matches found.</div>}
               </div>
             )}
           </div>
         </header>
-        <div className="view-body">{children}</div>
+        <main className="view-body" id="main-content" tabIndex={-1}>
+          {children}
+        </main>
       </div>
     </div>
   )

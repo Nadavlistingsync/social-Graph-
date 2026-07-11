@@ -73,7 +73,8 @@ function fitToNodes(
 export function GraphView() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const focusId = params.get('focus') ?? YOU_ID
+  const requestedFocusId = params.get('focus')
+  const focusId = requestedFocusId && getNode(requestedFocusId) ? requestedFocusId : YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
   const [hideWeak, setHideWeak] = useState(true)
   const [fitTick, setFitTick] = useState(0)
@@ -85,6 +86,12 @@ export function GraphView() {
   useEffect(() => {
     setSelectedId(focusId)
   }, [focusId])
+
+  useEffect(() => {
+    if (requestedFocusId && !getNode(requestedFocusId)) {
+      setParams({}, { replace: true })
+    }
+  }, [requestedFocusId, setParams])
 
   const filteredEdges = useMemo(() => {
     return edges.filter((e) => {
@@ -285,6 +292,22 @@ export function GraphView() {
       <div className="graph-layout">
         <div className="graph-canvas-wrap">
           <div className="graph-toolbar">
+            <label className="graph-node-picker">
+              <span className="sr-only">Focus a graph node</span>
+              <select
+                value={selectedId}
+                onChange={(event) => {
+                  setSelectedId(event.target.value)
+                  setParams({ focus: event.target.value })
+                }}
+              >
+                {nodes.map((node) => (
+                  <option key={node.id} value={node.id}>
+                    {node.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               className={`chip ${hideWeak ? 'on' : ''}`}
@@ -343,7 +366,8 @@ export function GraphView() {
                           setParams({ focus: other.id })
                         }}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
                             setSelectedId(other.id)
                             setParams({ focus: other.id })
                           }
