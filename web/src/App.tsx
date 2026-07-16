@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
+import { clearAwaitingContactStep, isAwaitingContactStep } from './lib/onboardingFlow'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
 import { Onboarding } from './views/Onboarding'
@@ -12,7 +14,22 @@ import { Settings } from './views/Settings'
 
 function AppRoutes() {
   const { isOnboarded } = useGraph()
-  if (!isOnboarded) return <Onboarding />
+  const [awaitingContacts, setAwaitingContacts] = useState(isAwaitingContactStep)
+
+  const showOnboarding = !isOnboarded || awaitingContacts
+
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        contactsOnly={isOnboarded && awaitingContacts}
+        onWorkspaceCreated={() => setAwaitingContacts(true)}
+        onEnterApp={() => {
+          clearAwaitingContactStep()
+          setAwaitingContacts(false)
+        }}
+      />
+    )
+  }
 
   return (
     <Routes>

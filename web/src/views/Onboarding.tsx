@@ -1,23 +1,47 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useGraph } from '../context/GraphContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import {
+  markAwaitingContactStep,
+  markFirstRunPending,
+} from '../lib/onboardingFlow'
 
-export function Onboarding() {
+type OnboardingProps = {
+  /** Workspace already created; show only the contacts step. */
+  contactsOnly?: boolean
+  onWorkspaceCreated?: () => void
+  onEnterApp?: () => void
+}
+
+export function Onboarding({
+  contactsOnly = false,
+  onWorkspaceCreated,
+  onEnterApp,
+}: OnboardingProps) {
   const navigate = useNavigate()
   const { finishOnboarding } = useGraph()
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2>(contactsOnly ? 2 : 1)
   const [name, setName] = useState('')
   const [loadSample, setLoadSample] = useState(true)
+  const [importedCount, setImportedCount] = useState<number | null>(null)
 
-  useDocumentTitle(step === 1 ? 'Welcome' : 'Import contacts')
+  useDocumentTitle(step === 1 ? 'Create your graph' : 'Connect contacts')
+
+  function enterApp() {
+    markFirstRunPending()
+    onEnterApp?.()
+    navigate('/', { replace: true })
+  }
 
   function startGraph(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
     finishOnboarding(trimmed, loadSample)
+    markAwaitingContactStep()
+    onWorkspaceCreated?.()
     setStep(2)
   }
 
@@ -26,15 +50,41 @@ export function Onboarding() {
       <div className="onboarding">
         <div className="onboarding-card onboarding-wide" id="main">
           <div className="brand-mark">Social Graph</div>
-          <h1>Who do you know?</h1>
+          <p className="onboarding-step" aria-hidden>
+            2 / 2
+          </p>
+          <h1>Connect who you know</h1>
           <p className="lede">
-            Connect your address book in one tap — same as signing into any app. Gmail, Outlook, or
-            your phone.
+            Optional — drop a contacts export or sign in. You can always do this later from the
+            sidebar.
           </p>
-          <ContactAuthPanel showSkip onSkip={() => navigate('/')} compact />
-          <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-            <Link to="/">Continue to your graph →</Link>
-          </p>
+
+          {importedCount !== null ? (
+            <div className="import-result onboarding-done">
+              <strong>
+                {importedCount === 0
+                  ? 'No new contacts added'
+                  : `Imported ${importedCount} contact${importedCount === 1 ? '' : 's'}`}
+              </strong>
+              <p className="section-hint">You’re set. Open your graph and find a warm intro.</p>
+              <button type="button" className="btn-primary" onClick={enterApp}>
+                Start exploring
+              </button>
+            </div>
+          ) : (
+            <>
+              <button type="button" className="btn-primary" onClick={enterApp}>
+                Start exploring
+              </button>
+              <div className="auth-divider onboarding-divider">
+                <span>or add contacts first</span>
+              </div>
+              <ContactAuthPanel
+                onSuccess={(imported) => setImportedCount(imported)}
+                compact
+              />
+            </>
+          )}
         </div>
       </div>
     )
@@ -44,10 +94,13 @@ export function Onboarding() {
     <div className="onboarding">
       <div className="onboarding-card" id="main">
         <div className="brand-mark">Social Graph</div>
-        <h1>Map your warm intros</h1>
+        <p className="onboarding-step" aria-hidden>
+          1 / 2
+        </p>
+        <h1>Create your graph</h1>
         <p className="lede">
-          One question: who do you know who can get you to someone else? Your graph stays in this
-          browser — no account required.
+          Who do you know who can get you to someone else? Your map stays in this browser — no
+          account or password.
         </p>
 
         <form onSubmit={startGraph}>
@@ -61,6 +114,7 @@ export function Onboarding() {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Alex Chen"
               autoFocus
+              autoComplete="name"
               required
             />
           </div>
@@ -77,7 +131,7 @@ export function Onboarding() {
               <span>
                 <strong>Sample network</strong>
                 <span className="choice-desc">
-                  Explore with a public NYC real-estate demo graph. Mark who you actually know.
+                  Explore with a public NYC real-estate demo. Mark who you actually know.
                 </span>
               </span>
             </label>
