@@ -90,7 +90,7 @@ describe('detectAndParseContacts', () => {
 })
 
 describe('importContacts', () => {
-  it('adds contacts to workspace and skips duplicates', () => {
+  it('adds contacts to workspace and merges duplicates', () => {
     localStorage.clear()
     resetWorkspace()
     completeOnboarding('Me', false)
@@ -102,6 +102,9 @@ describe('importContacts', () => {
     }
     const second = importContacts(parseVcard(SAMPLE_VCARD))
     expect(second.ok).toBe(true)
-    if (second.ok) expect(second.skipped).toBe(2)
+    if (second.ok) {
+      expect(second.merged).toBe(2)
+      expect(second.imported).toBe(0)
+    }
   })
 })

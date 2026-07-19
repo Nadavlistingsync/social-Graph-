@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ContactAuthPanel } from './ContactAuthPanel'
 import { isContactsFile } from '../lib/launchContacts'
 import { useContactImport } from '../context/ContactImportContext'
@@ -10,6 +11,7 @@ export function ImportContactsModal({
   open: boolean
   onClose: () => void
 }) {
+  const navigate = useNavigate()
   const { importFiles } = useContactImport()
   const [dragOver, setDragOver] = useState(false)
   const [dropping, setDropping] = useState(false)
@@ -21,10 +23,14 @@ export function ImportContactsModal({
       const files = [...e.dataTransfer.files].filter(isContactsFile)
       if (!files.length) return
       setDropping(true)
-      await importFiles(files)
+      const result = await importFiles(files)
       setDropping(false)
+      if (result && result.imported > 0) {
+        onClose()
+        navigate('/rate')
+      }
     },
-    [importFiles],
+    [importFiles, navigate, onClose],
   )
 
   if (!open) return null
@@ -45,15 +51,19 @@ export function ImportContactsModal({
       >
         <h2 id="import-contacts-title">Add your contacts</h2>
         <p className="section-hint">
-          Google, Apple Contacts, or LinkedIn Connections export — then they show up on your network
-          map.
+          Google, Apple, LinkedIn, or paste — then rate how well you know them.
         </p>
 
         <div className="drop-zone">
           {dropping ? 'Importing…' : 'Drop .vcf or .csv here (Apple, Google, or LinkedIn)'}
         </div>
 
-        <ContactAuthPanel onSuccess={() => {}} />
+        <ContactAuthPanel
+          onSuccess={() => {
+            onClose()
+            navigate('/rate')
+          }}
+        />
 
         <div className="modal-actions" style={{ marginTop: '1rem' }}>
           <button type="button" className="chip" onClick={onClose}>

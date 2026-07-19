@@ -33,7 +33,7 @@ export function ContactImportProvider({ children }: { children: ReactNode }) {
         if (!contacts.length) continue
         const res = importContacts(contacts)
         if (res.ok) {
-          allImported += res.imported
+          allImported += res.imported + res.merged
           allSkipped += res.skipped
         }
       }

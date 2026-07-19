@@ -34,6 +34,7 @@ function apiPlugin(): Plugin {
         let modulePath: string | null = null
         if (path === '/api/graph') modulePath = '/api/graph.js'
         else if (path === '/api/auth') modulePath = '/api/auth.js'
+        else if (path === '/api/ai') modulePath = '/api/ai.js'
         if (!modulePath) return next()
         try {
           const mod = await server.ssrLoadModule(modulePath)

@@ -18,9 +18,11 @@ Copy [`.env.example`](./.env.example) → `.env` and fill in:
 SUPABASE_URL=https://YOUR_REF.supabase.co
 SUPABASE_ANON_KEY=…
 SUPABASE_SERVICE_ROLE_KEY=…
+OPENROUTER_API_KEY=…          # AI relationship scoring
+# OPENROUTER_MODEL=google/gemini-2.5-flash-lite
 ```
 
-Same three vars on Vercel (Production). Auth + sync go through `/api/auth` and `/api/graph`.
+Same vars on Vercel (Production). Auth + sync + AI go through `/api/auth`, `/api/graph`, and `/api/ai`.
 
 In Supabase Auth → URL configuration, add your Vercel origin to **Redirect URLs**.
 Optional: disable **Confirm email** for smoother signup.
@@ -36,7 +38,8 @@ Open http://localhost:5173
 
 1. **Network** — see who you know, then who they know  
 2. **Find** — pick a target → see who to ask  
-3. **Note** — open anyone; every link has a source  
+3. **Rate** — import contacts, AI-score relationships (1–10), swipe to confirm  
+4. **Note** — open anyone; every link has a source  
 
 ## Deploy
 

@@ -119,6 +119,9 @@ export function Shell({
           <button type="button" className="btn-quiet desktop-only" onClick={openImport}>
             Contacts
           </button>
+          <Link to="/rate" className="btn-quiet desktop-only">
+            Rate
+          </Link>
           <Link to="/settings" className="btn-quiet desktop-only account-chip">
             {user ? (syncStatus === 'synced' ? 'Synced' : user.email?.split('@')[0] || 'Account') : 'Account'}
           </Link>

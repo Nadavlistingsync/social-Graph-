@@ -95,46 +95,33 @@ export function PersonPage() {
 
           {node.type === 'person' && node.id !== YOU_ID && warmth && (
             <section className="note-section">
-              <h2>Your warmth</h2>
-              <p className="section-hint">Only you see this. Path ranking uses it for first-hop scoring.</p>
-              <label className="warmth-toggle">
-                <input
-                  type="checkbox"
-                  checked={warmth.knownByUser}
-                  onChange={(e) => {
-                    const knownByUser = e.target.checked
-                    setWarmth(
-                      node.id,
-                      knownByUser
-                        ? { knownByUser: true, warmth: Math.max(warmth.warmth, 0.7) }
-                        : { knownByUser: false, warmth: 0.2 },
-                    )
-                  }}
-                />
-                I know them
-              </label>
-              {warmth.knownByUser && (
-                <div className="warmth-slider">
-                  <label className="field-label" htmlFor={`warmth-${node.id}`}>
-                    Warmth
-                  </label>
-                  <input
-                    id={`warmth-${node.id}`}
-                    type="range"
-                    min={0.5}
-                    max={1}
-                    step={0.05}
-                    value={warmth.warmth}
-                    onChange={(e) =>
+              <h2>How well you know them</h2>
+              <p className="section-hint">
+                1–10, private to you. Path ranking uses this for first-hop scoring.
+                {warmth.reason ? ` · ${warmth.reason}` : ''}
+              </p>
+              <div className="rate-scale person-rate-scale" role="group" aria-label="Score 1 to 10">
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`rate-scale-btn ${(warmth.score ?? Math.round(warmth.warmth * 10)) === n ? 'on' : ''}`}
+                    onClick={() =>
                       setWarmth(node.id, {
-                        knownByUser: true,
-                        warmth: Number(e.target.value),
+                        knownByUser: n >= 4,
+                        warmth: n / 10,
+                        score: n,
+                        reason: 'You set this score',
+                        source: 'user',
+                        confirmed: true,
+                        ratedAt: new Date().toISOString(),
                       })
                     }
-                  />
-                  <span className="warmth-value">{Math.round(warmth.warmth * 100)}%</span>
-                </div>
-              )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </section>
           )}
 

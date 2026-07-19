@@ -39,6 +39,18 @@ export function isSupabaseEnvConfigured() {
   return Boolean(supabaseUrl() && (anonKey() || serviceKey()))
 }
 
+export function openRouterKey() {
+  return env('OPENROUTER_API_KEY')
+}
+
+export function openRouterModel() {
+  return env('OPENROUTER_MODEL') || 'google/gemini-2.5-flash-lite'
+}
+
+export function isOpenRouterConfigured() {
+  return Boolean(openRouterKey())
+}
+
 export function send(res, status, body) {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json')
