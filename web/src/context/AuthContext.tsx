@@ -30,6 +30,7 @@ type AuthContextValue = {
   signUpWithPassword: (
     email: string,
     password: string,
+    name?: string,
   ) => Promise<{ ok: true; needsConfirm: boolean } | { ok: false; error: string }>
   signInWithMagicLink: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>
   signOut: () => Promise<void>
@@ -172,12 +173,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signUpWithPassword = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, name?: string) => {
       const result = await apiJson<AuthSession & { needsConfirm?: boolean }>('/api/auth?action=signup', {
         method: 'POST',
         body: JSON.stringify({
           email: email.trim(),
           password,
+          name: name?.trim() || undefined,
           redirectTo: window.location.origin,
         }),
       })

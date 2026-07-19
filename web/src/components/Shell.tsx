@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { searchNodes } from '../data/paths'
+import { useAuth } from '../context/AuthContext'
 import { useGraph } from '../context/GraphContext'
 import { useContactImport } from '../context/ContactImportContext'
 import { AddPersonModal } from './GraphModals'
@@ -26,6 +27,7 @@ export function Shell({
   const { openImport } = useContactImport()
   const navigate = useNavigate()
   const { profile, version } = useGraph()
+  const { user, syncStatus } = useAuth()
   const results = useMemo(() => {
     void version
     return open && q.trim() ? searchNodes(q).slice(0, 6) : []
@@ -117,6 +119,9 @@ export function Shell({
           <button type="button" className="btn-quiet desktop-only" onClick={openImport}>
             Contacts
           </button>
+          <Link to="/settings" className="btn-quiet desktop-only account-chip">
+            {user ? (syncStatus === 'synced' ? 'Synced' : user.email?.split('@')[0] || 'Account') : 'Account'}
+          </Link>
           <button type="button" className="btn-primary chrome-add" onClick={() => setAddOpen(true)}>
             Add
           </button>
