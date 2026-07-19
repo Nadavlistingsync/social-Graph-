@@ -17,11 +17,12 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<PathFinder />} />
-      <Route path="/graph" element={<GraphView />} />
+      <Route path="/" element={<GraphView />} />
+      <Route path="/find" element={<PathFinder />} />
+      <Route path="/graph" element={<Navigate to="/" replace />} />
       <Route path="/person/:id" element={<PersonPage />} />
       <Route path="/settings" element={<Settings />} />
-      <Route path="/paths" element={<Navigate to="/" replace />} />
+      <Route path="/paths" element={<Navigate to="/find" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )

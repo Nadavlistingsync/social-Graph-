@@ -216,7 +216,7 @@ export function Settings() {
         </section>
 
         <p style={{ marginTop: '2rem' }}>
-          <Link to="/">← Back to path finder</Link>
+          <Link to="/">← Back to network</Link>
         </p>
       </div>
     </Shell>

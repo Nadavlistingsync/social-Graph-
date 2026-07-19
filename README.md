@@ -34,8 +34,8 @@ npm run dev
 
 Open http://localhost:5173
 
-1. **Find path** — pick a target → see who to ask  
-2. **Graph** — explore the network  
+1. **Network** — see who you know, then who they know  
+2. **Find** — pick a target → see who to ask  
 3. **Note** — open anyone; every link has a source  
 
 ## Deploy
