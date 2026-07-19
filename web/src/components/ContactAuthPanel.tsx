@@ -229,8 +229,37 @@ export function ContactAuthPanel({
         </button>
       </div>
 
+      <button
+        type="button"
+        className="auth-btn device"
+        disabled={Boolean(loading)}
+        onClick={() => setPasteOpen((v) => !v)}
+      >
+        {pasteOpen ? 'Hide paste list' : 'Paste a list of names'}
+      </button>
+
+      {pasteOpen && (
+        <div className="paste-contacts">
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={5}
+            placeholder={'Alex Chen, alex@acme.com\nSam Rivera\nJordan Lee <jordan@example.com>'}
+            aria-label="Paste contacts"
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={Boolean(loading) || !pasteText.trim()}
+            onClick={handlePaste}
+          >
+            {loading === 'paste' ? 'Importing…' : 'Import pasted contacts'}
+          </button>
+        </div>
+      )}
+
       <div className="auth-divider">
-        <span>or upload / paste</span>
+        <span>or upload a file</span>
       </div>
 
       <div
@@ -256,35 +285,6 @@ export function ContactAuthPanel({
           e.target.value = ''
         }}
       />
-
-      <button
-        type="button"
-        className="text-btn"
-        style={{ marginTop: '0.75rem' }}
-        onClick={() => setPasteOpen((v) => !v)}
-      >
-        {pasteOpen ? 'Hide paste' : 'Paste a list of names'}
-      </button>
-
-      {pasteOpen && (
-        <div className="paste-contacts">
-          <textarea
-            value={pasteText}
-            onChange={(e) => setPasteText(e.target.value)}
-            rows={5}
-            placeholder={'Alex Chen, alex@acme.com\nSam Rivera\nJordan Lee <jordan@example.com>'}
-            aria-label="Paste contacts"
-          />
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={Boolean(loading) || !pasteText.trim()}
-            onClick={handlePaste}
-          >
-            {loading === 'paste' ? 'Importing…' : 'Import pasted contacts'}
-          </button>
-        </div>
-      )}
 
       <details className="import-help">
         <summary>How to export</summary>
