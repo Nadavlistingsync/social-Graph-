@@ -31,7 +31,7 @@ async function deriveHash(password: string, saltBase64: string): Promise<string>
     {
       name: 'PBKDF2',
       hash: 'SHA-256',
-      salt: base64ToBytes(saltBase64),
+      salt: base64ToBytes(saltBase64) as BufferSource,
       iterations: ITERATIONS,
     },
     keyMaterial,
