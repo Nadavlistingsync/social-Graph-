@@ -3,7 +3,7 @@
 export function env(name, ...fallbacks) {
   for (const key of [name, ...fallbacks]) {
     const v = process.env[key]
-    if (v) return v
+    if (typeof v === 'string' && v.trim()) return v.trim()
   }
   return ''
 }
