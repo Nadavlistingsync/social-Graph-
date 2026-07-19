@@ -2,6 +2,7 @@ export type ContactSource =
   | 'vcard'
   | 'google-csv'
   | 'outlook-csv'
+  | 'linkedin-csv'
   | 'google-api'
   | 'microsoft-api'
   | 'device-picker'
@@ -196,6 +197,71 @@ export function parseOutlookCsv(raw: string): ParsedContact[] {
   return contacts
 }
 
+/** Find the header row in a LinkedIn export (often has a Notes preamble). */
+export function findLinkedInHeaderRow(rows: string[][]): number {
+  for (let i = 0; i < Math.min(rows.length, 40); i++) {
+    const lower = rows[i].map((c) => c.toLowerCase().trim())
+    const hasFirst = lower.some((h) => h === 'first name')
+    const hasLast = lower.some((h) => h === 'last name')
+    const hasConnected = lower.some((h) => h.includes('connected on') || h === 'company' || h === 'position')
+    if (hasFirst && hasLast && hasConnected) return i
+  }
+  return -1
+}
+
+export function looksLikeLinkedInCsv(raw: string, filename?: string): boolean {
+  const lower = filename?.toLowerCase() ?? ''
+  if (lower.includes('connection') && lower.endsWith('.csv')) return true
+  const sample = raw.slice(0, 4000).toLowerCase()
+  if (sample.includes('connected on') && sample.includes('first name')) return true
+  if (sample.includes('notes:') && sample.includes('linkedin') && sample.includes('first name')) {
+    return true
+  }
+  return false
+}
+
+/**
+ * LinkedIn Settings → Data privacy → Get a copy of your data → Connections.
+ * Upload the Connections.csv from the unzipped archive.
+ */
+export function parseLinkedInCsv(raw: string): ParsedContact[] {
+  const rows = parseCsvRows(raw.replace(/^\uFEFF/, ''))
+  if (rows.length < 2) return []
+  const headerIdx = findLinkedInHeaderRow(rows)
+  if (headerIdx < 0) return []
+  const headers = rows[headerIdx]
+  const givenIdx = headerIndex(headers, 'First Name')
+  const familyIdx = headerIndex(headers, 'Last Name')
+  const emailIdx = headerIndex(headers, 'Email Address', 'Email')
+  const companyIdx = headerIndex(headers, 'Company')
+  const positionIdx = headerIndex(headers, 'Position', 'Title')
+  const connectedIdx = headerIndex(headers, 'Connected On')
+  const urlIdx = headerIndex(headers, 'URL', 'Profile URL')
+
+  const contacts: ParsedContact[] = []
+  for (const row of rows.slice(headerIdx + 1)) {
+    const name = [rowValue(row, givenIdx), rowValue(row, familyIdx)].filter(Boolean).join(' ').trim()
+    if (!name || name.toLowerCase() === 'first name last name') continue
+    const company = rowValue(row, companyIdx)
+    const position = rowValue(row, positionIdx)
+    const organization = [position, company].filter(Boolean).join(' · ') || undefined
+    const connected = rowValue(row, connectedIdx)
+    const url = rowValue(row, urlIdx)
+    const noteParts = [
+      connected ? `Connected ${connected}` : '',
+      url || '',
+    ].filter(Boolean)
+    contacts.push({
+      name,
+      email: rowValue(row, emailIdx) || undefined,
+      organization,
+      note: noteParts.length ? noteParts.join(' · ') : undefined,
+      source: 'linkedin-csv',
+    })
+  }
+  return contacts
+}
+
 export function detectAndParseContacts(raw: string, filename?: string): ParsedContact[] {
   const trimmed = raw.trim()
   const lower = filename?.toLowerCase() ?? ''
@@ -205,9 +271,24 @@ export function detectAndParseContacts(raw: string, filename?: string): ParsedCo
   }
 
   if (lower.endsWith('.csv') || trimmed.includes(',')) {
+    if (looksLikeLinkedInCsv(raw, filename)) {
+      const linkedin = parseLinkedInCsv(raw)
+      if (linkedin.length > 0) return linkedin
+    }
+    const rows = parseCsvRows(raw.replace(/^\uFEFF/, ''))
+    const headerIdx = findLinkedInHeaderRow(rows)
+    if (headerIdx >= 0) {
+      const headers = rows[headerIdx].map((h) => h.toLowerCase())
+      if (headers.some((h) => h.includes('connected on'))) {
+        const linkedin = parseLinkedInCsv(raw)
+        if (linkedin.length > 0) return linkedin
+      }
+    }
     const google = parseGoogleCsv(raw)
     if (google.length > 0) return google
-    return parseOutlookCsv(raw)
+    const outlook = parseOutlookCsv(raw)
+    if (outlook.length > 0) return outlook
+    return parseLinkedInCsv(raw)
   }
 
   if (trimmed.includes('BEGIN:VCARD')) return parseVcard(raw)
@@ -225,10 +306,14 @@ export function buildContactSummary(c: ParsedContact): string {
         : c.source === 'device-picker'
           ? 'your phone'
           : c.source === 'google-csv'
-        ? 'Google Contacts export'
-        : c.source === 'outlook-csv'
-          ? 'Outlook export'
-          : 'Contacts export'
+            ? 'Google Contacts export'
+            : c.source === 'outlook-csv'
+              ? 'Outlook export'
+              : c.source === 'linkedin-csv'
+                ? 'LinkedIn connections'
+                : c.source === 'vcard'
+                  ? 'Apple Contacts'
+                  : 'Contacts export'
   return `Imported from ${label}.`
 }
 
@@ -244,7 +329,9 @@ export function sourceLabel(source: ContactSource): string {
       return 'Google Contacts CSV'
     case 'outlook-csv':
       return 'Outlook CSV'
+    case 'linkedin-csv':
+      return 'LinkedIn Connections'
     case 'vcard':
-      return 'vCard'
+      return 'Apple Contacts (vCard)'
   }
 }

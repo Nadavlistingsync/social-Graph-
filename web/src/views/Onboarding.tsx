@@ -28,8 +28,7 @@ export function Onboarding() {
           <div className="brand-mark">Social Graph</div>
           <h1>Who do you know?</h1>
           <p className="lede">
-            Connect your address book in one tap — same as signing into any app. Gmail, Outlook, or
-            your phone.
+            Connect Google or Apple Contacts, or upload a LinkedIn Connections export.
           </p>
           <ContactAuthPanel showSkip onSkip={() => navigate('/')} compact />
           <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
