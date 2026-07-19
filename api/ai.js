@@ -152,17 +152,22 @@ export default async function handler(req, res) {
   const action = (url.searchParams.get('action') || '').replace(/^\//, '')
 
   if (action === 'status' && req.method === 'GET') {
+    const key = openRouterKey()
     return send(res, 200, {
-      configured: isOpenRouterConfigured(),
-      model: isOpenRouterConfigured() ? openRouterModel() : null,
+      configured: Boolean(key),
+      keyLength: key ? key.length : 0,
+      model: key ? openRouterModel() : null,
       free: true,
-      fallbacks: isOpenRouterConfigured() ? openRouterModelFallbacks() : [],
+      fallbacks: key ? openRouterModelFallbacks() : [],
     })
   }
 
   if (action === 'rate' && req.method === 'POST') {
     if (!isOpenRouterConfigured()) {
-      return send(res, 503, { error: 'OpenRouter is not configured (OPENROUTER_API_KEY)' })
+      return send(res, 503, {
+        error:
+          'OPENROUTER_API_KEY is missing on the server. In Vercel: Key=OPENROUTER_API_KEY, Value=sk-or-v1-…, then Redeploy.',
+      })
     }
     try {
       const body = await readJson(req)
