@@ -1,3 +1,4 @@
+import { getActiveAccountId } from './authStore'
 import { demoEdges, demoNodes } from './seed'
 import { importContactsIntoWorkspace, type ContactImportResult } from './contactImportBatch'
 import type { ParsedContact } from './contactImport'
@@ -5,6 +6,7 @@ import type { GraphEdge, GraphNode } from './types'
 
 export const YOU_ID = 'you'
 const WORKSPACE_KEY = 'sg-workspace-v2'
+const LEGACY_WORKSPACE_KEY = 'sg-workspace-v2'
 
 export type WorkspaceProfile = {
   name: string
@@ -30,9 +32,14 @@ const defaultWorkspace = (): Workspace => ({
   customEdges: [],
 })
 
+function workspaceKey(): string {
+  const accountId = getActiveAccountId()
+  return accountId ? `${WORKSPACE_KEY}:${accountId}` : LEGACY_WORKSPACE_KEY
+}
+
 function readWorkspace(): Workspace {
   try {
-    const raw = localStorage.getItem(WORKSPACE_KEY)
+    const raw = localStorage.getItem(workspaceKey())
     if (!raw) return defaultWorkspace()
     const parsed = JSON.parse(raw) as Workspace
     if (!parsed?.profile) return defaultWorkspace()
@@ -48,7 +55,7 @@ function readWorkspace(): Workspace {
 
 function writeWorkspace(ws: Workspace): void {
   try {
-    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(ws))
+    localStorage.setItem(workspaceKey(), JSON.stringify(ws))
   } catch {
     /* ignore */
   }
@@ -188,14 +195,79 @@ export function saveWorkspaceState(ws: Workspace): void {
   writeWorkspace(ws)
 }
 
+function accountPrefKeys(accountId: string | null): {
+  warmth: string
+  awkward: string
+  notesPrefix: string
+} {
+  const suffix = accountId ? `:${accountId}` : ''
+  return {
+    warmth: `sg-warmth-v1${suffix}`,
+    awkward: `sg-awkward-edges-v1${suffix}`,
+    notesPrefix: accountId ? `sg-notes:${accountId}:` : 'sg-notes-',
+  }
+}
+
 export function resetWorkspace(): void {
+  const accountId = getActiveAccountId()
+  const keys = accountPrefKeys(accountId)
   try {
-    localStorage.removeItem(WORKSPACE_KEY)
-    localStorage.removeItem('sg-warmth-v1')
-    localStorage.removeItem('sg-awkward-edges-v1')
+    localStorage.removeItem(workspaceKey())
+    localStorage.removeItem(keys.warmth)
+    localStorage.removeItem(keys.awkward)
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i)
-      if (key?.startsWith('sg-notes-')) localStorage.removeItem(key)
+      if (key?.startsWith(keys.notesPrefix)) localStorage.removeItem(key)
+    }
+    // Legacy unscoped cleanup when resetting without an account (tests)
+    if (!accountId) {
+      localStorage.removeItem(LEGACY_WORKSPACE_KEY)
+      localStorage.removeItem('sg-warmth-v1')
+      localStorage.removeItem('sg-awkward-edges-v1')
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i)
+        if (key?.startsWith('sg-notes-')) localStorage.removeItem(key)
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * If this account has no workspace yet but a legacy unscoped workspace exists,
+ * claim it so early users keep their graph after creating an account.
+ */
+export function claimLegacyWorkspaceIfNeeded(): void {
+  const accountId = getActiveAccountId()
+  if (!accountId) return
+  const scopedKey = `${WORKSPACE_KEY}:${accountId}`
+  try {
+    if (localStorage.getItem(scopedKey)) return
+    const legacy = localStorage.getItem(LEGACY_WORKSPACE_KEY)
+    if (!legacy) return
+    localStorage.setItem(scopedKey, legacy)
+    localStorage.removeItem(LEGACY_WORKSPACE_KEY)
+
+    const warmth = localStorage.getItem('sg-warmth-v1')
+    if (warmth && !localStorage.getItem(`sg-warmth-v1:${accountId}`)) {
+      localStorage.setItem(`sg-warmth-v1:${accountId}`, warmth)
+      localStorage.removeItem('sg-warmth-v1')
+    }
+    const awkward = localStorage.getItem('sg-awkward-edges-v1')
+    if (awkward && !localStorage.getItem(`sg-awkward-edges-v1:${accountId}`)) {
+      localStorage.setItem(`sg-awkward-edges-v1:${accountId}`, awkward)
+      localStorage.removeItem('sg-awkward-edges-v1')
+    }
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith('sg-notes-') || key.startsWith('sg-notes:')) continue
+      const id = key.slice('sg-notes-'.length)
+      const value = localStorage.getItem(key)
+      if (value != null) {
+        localStorage.setItem(`sg-notes:${accountId}:${id}`, value)
+        localStorage.removeItem(key)
+      }
     }
   } catch {
     /* ignore */
@@ -206,7 +278,10 @@ export function resetWorkspace(): void {
 export function migrateLegacyUser(): void {
   if (readWorkspace().profile.onboarded) return
   try {
-    const warmth = localStorage.getItem('sg-warmth-v1')
+    const warmthKey = getActiveAccountId()
+      ? `sg-warmth-v1:${getActiveAccountId()}`
+      : 'sg-warmth-v1'
+    const warmth = localStorage.getItem(warmthKey) ?? localStorage.getItem('sg-warmth-v1')
     if (!warmth) return
     const parsed = JSON.parse(warmth) as Record<string, { knownByUser: boolean; warmth: number }>
     if (parsed.nadav) {
@@ -214,7 +289,7 @@ export function migrateLegacyUser(): void {
       const migrated = { ...parsed }
       delete migrated.nadav
       if (Object.keys(migrated).length) {
-        localStorage.setItem('sg-warmth-v1', JSON.stringify(migrated))
+        localStorage.setItem(warmthKey, JSON.stringify(migrated))
       }
     }
   } catch {

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
+import { useContactImport } from '../context/ContactImportContext'
 import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { clearFirstRunPending, isFirstRunPending } from '../lib/onboardingFlow'
 import type { RankedPath } from '../data/types'
 
 function formatScore(n: number): string {
@@ -27,8 +29,10 @@ function ScoreRow({ path }: { path: RankedPath }) {
 export function PathFinder() {
   const { version, youId, nodes, profile } = useGraph()
   const { version: prefVersion } = usePreferences()
+  const { openImport } = useContactImport()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const [showFirstRun, setShowFirstRun] = useState(isFirstRunPending)
   const people = useMemo(() => {
     void version
     return nodes.filter((n) => n.type === 'person' && n.id !== youId)
@@ -39,6 +43,11 @@ export function PathFinder() {
   const initial =
     paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : defaultTarget
   const [targetId, setTargetId] = useState(initial)
+
+  function dismissFirstRun() {
+    clearFirstRunPending()
+    setShowFirstRun(false)
+  }
 
   useEffect(() => {
     const next = params.get('to')
@@ -72,6 +81,26 @@ export function PathFinder() {
     <Shell active="paths">
       <div className="path-layout simple" id="main">
         <div className="path-form">
+          {showFirstRun && (
+            <div className="first-run-banner" role="status">
+              <div>
+                <strong>You’re in, {profile.name.split(' ')[0] || 'there'}.</strong>
+                <p>
+                  Pick a target below
+                  {profile.loadSample ? ', mark people you know on their notes,' : ','} or connect
+                  contacts anytime from the sidebar.
+                </p>
+              </div>
+              <div className="first-run-actions">
+                <button type="button" className="chip on" onClick={openImport}>
+                  Connect contacts
+                </button>
+                <button type="button" className="chip" onClick={dismissFirstRun}>
+                  Got it
+                </button>
+              </div>
+            </div>
+          )}
           <p className="demo-banner">
             {profile.loadSample
               ? 'Sample public network shown — mark who you actually know.'
@@ -83,7 +112,9 @@ export function PathFinder() {
           {people.length === 0 ? (
             <div className="verdict">
               <strong>Add someone first</strong>
-              <p>Use “Add person” in the sidebar to start building your graph.</p>
+              <p>
+                Use “Add person” or “Connect contacts” in the sidebar to start building your graph.
+              </p>
             </div>
           ) : (
             <>

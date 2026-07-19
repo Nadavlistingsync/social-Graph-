@@ -11,6 +11,7 @@ import type { GraphEdge, GraphNode } from '../data/types'
 import {
   addEdge as storeAddEdge,
   addPerson as storeAddPerson,
+  claimLegacyWorkspaceIfNeeded,
   completeOnboarding,
   getEdges,
   getNodes,
@@ -27,6 +28,7 @@ import {
 } from '../data/graphStore'
 import { saveWarmthOverride } from '../data/preferences'
 import type { ParsedContact } from '../data/contactImport'
+import { useAuth } from './AuthContext'
 
 type GraphContextValue = {
   version: number
@@ -66,16 +68,19 @@ type GraphContextValue = {
 const GraphContext = createContext<GraphContextValue | null>(null)
 
 export function GraphProvider({ children }: { children: ReactNode }) {
+  const { version: authVersion } = useAuth()
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
   useEffect(() => {
+    claimLegacyWorkspaceIfNeeded()
     migrateLegacyUser()
     bump()
-  }, [bump])
+  }, [authVersion, bump])
 
   const value = useMemo<GraphContextValue>(() => {
     void version
+    void authVersion
     const profile = getProfile()
     return {
       version,
@@ -174,7 +179,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         bump()
       },
     }
-  }, [version, bump])
+  }, [version, authVersion, bump])
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>
 }

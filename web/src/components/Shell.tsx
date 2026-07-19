@@ -2,9 +2,11 @@ import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { searchNodes } from '../data/paths'
+import { useAuth } from '../context/AuthContext'
 import { useGraph } from '../context/GraphContext'
 import { useContactImport } from '../context/ContactImportContext'
 import { usePreferences } from '../context/PreferencesContext'
+import { clearAwaitingContactStep, clearFirstRunPending } from '../lib/onboardingFlow'
 import { AddPersonModal } from './GraphModals'
 
 const links = [
@@ -27,6 +29,7 @@ export function Shell({
   const navigate = useNavigate()
   const importRef = useRef<HTMLInputElement>(null)
   const { profile, version } = useGraph()
+  const { logOut } = useAuth()
   const { exportData, importData } = usePreferences()
   const results = useMemo(() => {
     void version
@@ -82,6 +85,17 @@ export function Shell({
           <Link to="/settings" className="text-btn">
             Settings
           </Link>
+          <button
+            type="button"
+            className="text-btn"
+            onClick={() => {
+              clearAwaitingContactStep()
+              clearFirstRunPending()
+              logOut()
+            }}
+          >
+            Log out
+          </button>
           <button type="button" className="text-btn" onClick={handleExport}>
             Export data
           </button>

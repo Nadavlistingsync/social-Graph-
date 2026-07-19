@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
+import { clearAwaitingContactStep, isAwaitingContactStep } from './lib/onboardingFlow'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
 import { Onboarding } from './views/Onboarding'
@@ -11,8 +14,22 @@ import { PathFinder } from './views/PathFinder'
 import { Settings } from './views/Settings'
 
 function AppRoutes() {
+  const { isLoggedIn } = useAuth()
   const { isOnboarded } = useGraph()
-  if (!isOnboarded) return <Onboarding />
+  const [awaitingContacts, setAwaitingContacts] = useState(isAwaitingContactStep)
+
+  if (!isLoggedIn || !isOnboarded || awaitingContacts) {
+    return (
+      <Onboarding
+        contactsOnly={isLoggedIn && isOnboarded && awaitingContacts}
+        onWorkspaceCreated={() => setAwaitingContacts(true)}
+        onEnterApp={() => {
+          clearAwaitingContactStep()
+          setAwaitingContacts(false)
+        }}
+      />
+    )
+  }
 
   return (
     <Routes>
@@ -29,18 +46,20 @@ function AppRoutes() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <GraphProvider>
-        <PreferencesProvider>
-          <ContactImportProvider>
-            <BrowserRouter>
-              <a href="#main" className="skip-link">
-                Skip to content
-              </a>
-              <AppRoutes />
-            </BrowserRouter>
-          </ContactImportProvider>
-        </PreferencesProvider>
-      </GraphProvider>
+      <AuthProvider>
+        <GraphProvider>
+          <PreferencesProvider>
+            <ContactImportProvider>
+              <BrowserRouter>
+                <a href="#main" className="skip-link">
+                  Skip to content
+                </a>
+                <AppRoutes />
+              </BrowserRouter>
+            </ContactImportProvider>
+          </PreferencesProvider>
+        </GraphProvider>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }
