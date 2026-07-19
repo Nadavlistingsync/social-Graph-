@@ -3,8 +3,7 @@ import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
-function loadEnvLocal() {
-  const path = resolve(__dirname, '.env.local')
+function loadEnvFile(path: string) {
   if (!existsSync(path)) return
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     const trimmed = line.trim()
@@ -17,21 +16,28 @@ function loadEnvLocal() {
   }
 }
 
-function graphApiPlugin(): Plugin {
+function loadServerEnv() {
+  // Prefer server .env — never bake secrets into the Vite client bundle
+  loadEnvFile(resolve(__dirname, '../../.env'))
+  loadEnvFile(resolve(__dirname, '../.env'))
+  loadEnvFile(resolve(__dirname, '.env'))
+  loadEnvFile(resolve(__dirname, '.env.local'))
+}
+
+function apiPlugin(): Plugin {
   return {
-    name: 'graph-api-dev',
+    name: 'server-api-dev',
     configureServer(server) {
-      loadEnvLocal()
-      // Mirror server-only secrets for local middleware
-      if (!process.env.SUPABASE_URL && process.env.VITE_SUPABASE_URL) {
-        process.env.SUPABASE_URL = process.env.VITE_SUPABASE_URL
-      }
+      loadServerEnv()
       server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith('/api/graph')) return next()
+        const path = req.url?.split('?')[0] || ''
+        let modulePath: string | null = null
+        if (path === '/api/graph') modulePath = '/api/graph.js'
+        else if (path === '/api/auth') modulePath = '/api/auth.js'
+        if (!modulePath) return next()
         try {
-          const mod = await server.ssrLoadModule('/api/graph.js')
-          const handler = mod.default
-          await handler(req, res)
+          const mod = await server.ssrLoadModule(modulePath)
+          await mod.default(req, res)
         } catch (err) {
           res.statusCode = 500
           res.setHeader('Content-Type', 'application/json')
@@ -43,5 +49,7 @@ function graphApiPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), graphApiPlugin()],
+  plugins: [react(), apiPlugin()],
+  // Do not expose SUPABASE_* to import.meta.env
+  envPrefix: ['VITE_'],
 })

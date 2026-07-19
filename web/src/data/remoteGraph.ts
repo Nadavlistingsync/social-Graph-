@@ -1,4 +1,4 @@
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
+import { loadSession } from '../lib/authSession'
 import {
   localDataHasContent,
   readUserDataBlob,
@@ -9,10 +9,7 @@ import {
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline'
 
 async function accessToken(): Promise<string | null> {
-  const sb = getSupabase()
-  if (!sb) return null
-  const { data } = await sb.auth.getSession()
-  return data.session?.access_token ?? null
+  return loadSession()?.access_token ?? null
 }
 
 async function apiGraph(method: 'GET' | 'PUT', body?: UserDataBlob): Promise<Response> {
@@ -53,11 +50,7 @@ export async function upsertRemoteGraph(blob: UserDataBlob): Promise<void> {
   }
 }
 
-/**
- * On sign-in: remote wins when present; otherwise upload local browser data.
- */
 export async function reconcileOnSignIn(_userId: string): Promise<'pulled' | 'pushed' | 'empty'> {
-  if (!isSupabaseConfigured) return 'empty'
   const remote = await fetchRemoteGraph()
   if (remote?.workspace?.profile) {
     writeUserDataBlob(

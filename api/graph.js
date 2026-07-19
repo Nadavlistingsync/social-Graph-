@@ -1,60 +1,18 @@
 /**
- * Sync API — verifies the user's Supabase JWT, then reads/writes their graph
- * blob in Storage with the service role (bypasses Storage RLS).
- *
- * Env (Vercel / local middleware, NOT VITE_):
- *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
+ * Sync API — verifies the user's JWT, then reads/writes their graph in Storage.
+ * Secrets come only from server .env (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
  */
+import {
+  bearer,
+  readBody,
+  send,
+  serviceKey,
+  supabaseUrl,
+  verifyUser,
+} from './_lib.js'
+
 const BUCKET = 'user-graphs'
 const OBJECT = 'graph.json'
-
-function env(name, ...fallbacks) {
-  for (const key of [name, ...fallbacks]) {
-    const v = process.env[key]
-    if (v) return v
-  }
-  return ''
-}
-
-function supabaseUrl() {
-  return env('SUPABASE_URL', 'VITE_SUPABASE_URL').replace(/\/$/, '')
-}
-
-function serviceKey() {
-  return env('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY')
-}
-
-function anonKey() {
-  return env('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY', 'VITE_SUPABASE_PUBLISHABLE_KEY')
-}
-
-function send(res, status, body) {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json')
-  res.setHeader('Cache-Control', 'no-store')
-  res.end(typeof body === 'string' ? body : JSON.stringify(body))
-}
-
-async function readBody(req) {
-  const chunks = []
-  for await (const chunk of req) chunks.push(chunk)
-  return Buffer.concat(chunks).toString('utf8')
-}
-
-async function verifyUser(accessToken) {
-  const url = supabaseUrl()
-  const key = anonKey() || serviceKey()
-  const res = await fetch(`${url}/auth/v1/user`, {
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  })
-  if (!res.ok) return null
-  const user = await res.json()
-  return user?.id ? user : null
-}
 
 async function storageFetch(userId, method, body) {
   const url = supabaseUrl()
@@ -80,12 +38,11 @@ export default async function handler(req, res) {
 
   if (!supabaseUrl() || !serviceKey()) {
     return send(res, 503, {
-      error: 'Server missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY',
+      error: 'Server missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in .env',
     })
   }
 
-  const auth = req.headers.authorization || ''
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  const token = bearer(req)
   if (!token) return send(res, 401, { error: 'Missing Authorization bearer token' })
 
   const user = await verifyUser(token)

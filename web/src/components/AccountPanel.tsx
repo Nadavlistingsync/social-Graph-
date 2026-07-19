@@ -24,8 +24,9 @@ export function AccountPanel({ compact = false }: { compact?: boolean }) {
   if (!configured) {
     return (
       <p className="section-hint">
-        Cloud sync is not configured. Set <code>VITE_SUPABASE_URL</code> and{' '}
-        <code>VITE_SUPABASE_ANON_KEY</code> on Vercel (or in <code>.env.local</code>).
+        Cloud sync is not configured. Add <code>SUPABASE_URL</code>,{' '}
+        <code>SUPABASE_ANON_KEY</code>, and <code>SUPABASE_SERVICE_ROLE_KEY</code> to the server{' '}
+        <code>.env</code> (or Vercel env vars).
       </p>
     )
   }
