@@ -43,13 +43,14 @@ export function ImportContactsModal({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <h2 id="import-contacts-title">Connect your contacts</h2>
+        <h2 id="import-contacts-title">Add your contacts</h2>
         <p className="section-hint">
-          Sign in with Google or Microsoft, pick from your phone, or drop an Apple/Gmail export file.
+          Google, Apple Contacts, or LinkedIn Connections export — then they show up on your network
+          map.
         </p>
 
         <div className="drop-zone">
-          {dropping ? 'Importing…' : 'Drop a .vcf or .csv file here'}
+          {dropping ? 'Importing…' : 'Drop .vcf or .csv here (Apple, Google, or LinkedIn)'}
         </div>
 
         <ContactAuthPanel onSuccess={() => {}} />

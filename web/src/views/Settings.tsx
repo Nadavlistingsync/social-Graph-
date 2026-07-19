@@ -164,10 +164,10 @@ export function Settings() {
         <section className="note-section">
           <h2>Import contacts</h2>
           <p className="section-hint">
-            Bring in people from Google, Microsoft Outlook, your phone, or an Apple vCard export.
+            Google Contacts, Apple Contacts (.vcf), LinkedIn Connections.csv, Outlook, or your phone.
           </p>
           <button type="button" className="chip on" onClick={openImport}>
-            Connect address book
+            Add contacts
           </button>
         </section>
 

@@ -27,7 +27,10 @@ export function Onboarding() {
         <div className="onboarding-card onboarding-wide" id="main">
           <div className="brand-mark">Social Graph</div>
           <h1>Add people you know</h1>
-          <p className="lede">Import contacts, or skip and add them on the map.</p>
+          <p className="lede">
+            Google, Apple Contacts, or a LinkedIn Connections.csv — or skip and add people on the
+            map.
+          </p>
           <ContactAuthPanel showSkip onSkip={() => navigate('/')} compact />
           <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
             <Link to="/">See my network →</Link>

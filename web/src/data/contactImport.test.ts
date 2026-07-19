@@ -3,6 +3,7 @@ import { completeOnboarding, getNodes, importContacts, resetWorkspace } from './
 import {
   detectAndParseContacts,
   parseGoogleCsv,
+  parseLinkedInCsv,
   parseOutlookCsv,
   parseVcard,
 } from './contactImport'
@@ -24,6 +25,14 @@ END:VCARD`
 const SAMPLE_GOOGLE_CSV = `Name,Given Name,Family Name,E-mail 1 - Value,Organization 1 - Name,Notes
 Alice Smith,Alice,Smith,alice@corp.com,Corp Inc,Investor
 Bob Jones,Bob,Jones,bob@test.com,,`
+
+const SAMPLE_LINKEDIN_CSV = `Notes:
+"When exporting your connection data, LinkedIn notes that…"
+
+First Name,Last Name,Email Address,Company,Position,Connected On
+Ada,Lovelace,ada@analytical.engine,Analytical Engine,Mathematician,15 Jan 2020
+Grace,Hopper,,US Navy,Rear Admiral,01 Mar 2019
+`
 
 describe('parseVcard', () => {
   it('parses Apple-style vCard exports', () => {
@@ -51,6 +60,25 @@ describe('parseOutlookCsv', () => {
     const contacts = parseOutlookCsv(raw)
     expect(contacts[0].name).toBe('Pat Lee')
     expect(contacts[0].email).toBe('pat@co.com')
+  })
+})
+
+describe('parseLinkedInCsv', () => {
+  it('skips the Notes preamble and maps company/position', () => {
+    const contacts = parseLinkedInCsv(SAMPLE_LINKEDIN_CSV)
+    expect(contacts).toHaveLength(2)
+    expect(contacts[0].name).toBe('Ada Lovelace')
+    expect(contacts[0].email).toBe('ada@analytical.engine')
+    expect(contacts[0].organization).toBe('Mathematician · Analytical Engine')
+    expect(contacts[0].note).toContain('Connected 15 Jan 2020')
+    expect(contacts[0].source).toBe('linkedin-csv')
+    expect(contacts[1].name).toBe('Grace Hopper')
+  })
+
+  it('detects LinkedIn by filename Connections.csv', () => {
+    const contacts = detectAndParseContacts(SAMPLE_LINKEDIN_CSV, 'Connections.csv')
+    expect(contacts[0].source).toBe('linkedin-csv')
+    expect(contacts).toHaveLength(2)
   })
 })
 

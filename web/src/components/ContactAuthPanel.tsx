@@ -54,7 +54,7 @@ export function ContactAuthPanel({
     try {
       const contacts = await fetcher()
       if (!contacts.length) {
-        setError('No contacts returned. Try another sign-in option.')
+        setError('No contacts returned. Try another option or upload a file.')
         setLoading(null)
         return
       }
@@ -94,7 +94,9 @@ export function ContactAuthPanel({
     try {
       let imported = 0
       let skipped = 0
+      let sawFile = false
       for (const file of files.filter(isContactsFile)) {
+        sawFile = true
         const contacts = await parseContactsFile(file)
         if (!contacts.length) continue
         const res = importContacts(contacts)
@@ -103,8 +105,13 @@ export function ContactAuthPanel({
           skipped += res.skipped
         }
       }
+      if (!sawFile) {
+        setError('Use a .vcf (Apple) or .csv (Google / LinkedIn) file.')
+        setLoading(null)
+        return
+      }
       if (!imported) {
-        setError('No contacts found in that file.')
+        setError('No contacts found in that file. For LinkedIn, upload Connections.csv from the unzipped export.')
         setLoading(null)
         return
       }
@@ -146,6 +153,47 @@ export function ContactAuthPanel({
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
+      <div className="auth-buttons">
+        <button
+          type="button"
+          className="auth-btn google"
+          disabled={Boolean(loading)}
+          onClick={handleGoogle}
+        >
+          <span className="auth-icon" aria-hidden>
+            G
+          </span>
+          {loading === 'google' ? 'Signing in…' : 'Google Contacts'}
+        </button>
+
+        {deviceReady && (
+          <button
+            type="button"
+            className="auth-btn device"
+            disabled={Boolean(loading)}
+            onClick={() => runImport('device', pickDeviceContacts)}
+          >
+            {loading === 'device' ? 'Opening…' : 'This phone / Mac contacts'}
+          </button>
+        )}
+
+        <button
+          type="button"
+          className="auth-btn microsoft"
+          disabled={Boolean(loading)}
+          onClick={handleMicrosoft}
+        >
+          <span className="auth-icon" aria-hidden>
+            M
+          </span>
+          {loading === 'microsoft' ? 'Signing in…' : 'Microsoft Outlook'}
+        </button>
+      </div>
+
+      <div className="auth-divider">
+        <span>or upload a file</span>
+      </div>
+
       <div
         className="drop-zone inline"
         onClick={() => fileRef.current?.click()}
@@ -153,7 +201,9 @@ export function ContactAuthPanel({
         role="button"
         tabIndex={0}
       >
-        {loading === 'file' ? 'Reading file…' : 'Drop Apple / Gmail export here, or click to browse'}
+        {loading === 'file'
+          ? 'Reading file…'
+          : 'Apple .vcf · Google CSV · LinkedIn Connections.csv'}
       </div>
       <input
         ref={fileRef}
@@ -168,51 +218,25 @@ export function ContactAuthPanel({
         }}
       />
 
-      <div className="auth-divider">
-        <span>or sign in</span>
-      </div>
-
-      <div className="auth-buttons">
-        <button
-          type="button"
-          className="auth-btn google"
-          disabled={Boolean(loading)}
-          onClick={handleGoogle}
-        >
-          <span className="auth-icon" aria-hidden>
-            G
-          </span>
-          {loading === 'google' ? 'Signing in…' : 'Continue with Google'}
-        </button>
-
-        <button
-          type="button"
-          className="auth-btn microsoft"
-          disabled={Boolean(loading)}
-          onClick={handleMicrosoft}
-        >
-          <span className="auth-icon" aria-hidden>
-            M
-          </span>
-          {loading === 'microsoft' ? 'Signing in…' : 'Continue with Microsoft'}
-        </button>
-
-        {deviceReady && (
-          <button
-            type="button"
-            className="auth-btn device"
-            disabled={Boolean(loading)}
-            onClick={() => runImport('device', pickDeviceContacts)}
-          >
-            {loading === 'device' ? 'Opening…' : 'Pick from this device'}
-          </button>
-        )}
-      </div>
+      <details className="import-help">
+        <summary>How to export</summary>
+        <ul>
+          <li>
+            <strong>Google</strong> — tap Google Contacts above, or Contacts → Export → Google CSV.
+          </li>
+          <li>
+            <strong>Apple</strong> — Contacts app → select All Contacts → File → Export → Export
+            vCard (.vcf).
+          </li>
+          <li>
+            <strong>LinkedIn</strong> — Settings → Data privacy → Get a copy of your data → check
+            Connections → download → unzip → upload <code>Connections.csv</code>.
+          </li>
+        </ul>
+      </details>
 
       <p className="section-hint auth-hint">
-        {googleReady && microsoftReady
-          ? 'One tap — names and emails only. Stays in your browser.'
-          : 'Google / Microsoft need a one-time setup (30 sec) — tap the button and we’ll walk you through it.'}
+        Names and emails only. Stays in this browser (and syncs if you’re signed in).
       </p>
 
       {error && <p className="form-error">{error}</p>}
