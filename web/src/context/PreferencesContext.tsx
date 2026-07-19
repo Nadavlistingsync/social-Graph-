@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -32,6 +33,12 @@ const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
+
+  useEffect(() => {
+    const onReload = () => bump()
+    window.addEventListener('sg-data-reloaded', onReload)
+    return () => window.removeEventListener('sg-data-reloaded', onReload)
+  }, [bump])
 
   const value = useMemo<PreferencesContextValue>(() => {
     void version

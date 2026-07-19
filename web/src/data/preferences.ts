@@ -1,4 +1,5 @@
 import { loadWorkspaceState, saveWorkspaceState, type Workspace } from './graphStore'
+import { notifyUserDataChanged } from './syncBus'
 
 export type WarmthOverride = { knownByUser: boolean; warmth: number }
 
@@ -15,12 +16,13 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-function writeJson(key: string, value: unknown): void {
+function writeJson(key: string, value: unknown, sync = true): void {
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
     /* ignore quota / private mode */
   }
+  if (sync) notifyUserDataChanged()
 }
 
 export function loadWarmthOverrides(): Record<string, WarmthOverride> {
@@ -93,8 +95,8 @@ export function importUserData(raw: string): { ok: true } | { ok: false; error: 
       return { ok: false, error: 'Invalid file format' }
     }
     if (data.workspace) saveWorkspaceState(data.workspace)
-    if (data.warmth) writeJson(WARMTH_KEY, data.warmth)
-    if (data.awkwardEdges) writeJson(AWKWARD_KEY, data.awkwardEdges)
+    if (data.warmth) writeJson(WARMTH_KEY, data.warmth, false)
+    if (data.awkwardEdges) writeJson(AWKWARD_KEY, data.awkwardEdges, false)
     if (data.notes) {
       for (const [id, text] of Object.entries(data.notes)) {
         try {
@@ -104,6 +106,7 @@ export function importUserData(raw: string): { ok: true } | { ok: false; error: 
         }
       }
     }
+    notifyUserDataChanged()
     return { ok: true }
   } catch {
     return { ok: false, error: 'Could not parse JSON' }

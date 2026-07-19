@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { AuthProvider } from './context/AuthContext'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
@@ -29,18 +30,20 @@ function AppRoutes() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <GraphProvider>
-        <PreferencesProvider>
-          <ContactImportProvider>
-            <BrowserRouter>
-              <a href="#main" className="skip-link">
-                Skip to content
-              </a>
-              <AppRoutes />
-            </BrowserRouter>
-          </ContactImportProvider>
-        </PreferencesProvider>
-      </GraphProvider>
+      <AuthProvider>
+        <GraphProvider>
+          <PreferencesProvider>
+            <ContactImportProvider>
+              <BrowserRouter>
+                <a href="#main" className="skip-link">
+                  Skip to content
+                </a>
+                <AppRoutes />
+              </BrowserRouter>
+            </ContactImportProvider>
+          </PreferencesProvider>
+        </GraphProvider>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }

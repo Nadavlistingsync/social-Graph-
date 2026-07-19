@@ -8,6 +8,21 @@ Warm-intro map. One question: **who do I know who can get me to this person?**
 
 Hard-refresh if you still see an old 404 (`Cmd/Ctrl + Shift + R`).
 
+## Cloud sync (Supabase)
+
+Set on Vercel (and optionally in `web/.env.local`):
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY` (anon JWT or `sb_publishable_…`)
+
+Apply the schema once: paste [`supabase/migrations/001_user_graphs.sql`](./supabase/migrations/001_user_graphs.sql) into the Supabase SQL Editor, **or** run with your secret key:
+
+```bash
+SUPABASE_URL=https://YOUR_REF.supabase.co SUPABASE_SECRET_KEY=sb_secret_… node web/scripts/apply-schema.mjs
+```
+
+In Supabase Auth → URL configuration, add your Vercel origin to **Redirect URLs**.
+
 ## Local
 
 ```bash

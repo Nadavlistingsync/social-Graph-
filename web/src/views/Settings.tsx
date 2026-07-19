@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AccountPanel } from '../components/AccountPanel'
 import { Shell } from '../components/Shell'
 import { contactAuthStatus } from '../components/ContactAuthPanel'
 import { useContactImport } from '../context/ContactImportContext'
@@ -52,7 +53,14 @@ export function Settings() {
     <Shell active="settings">
       <div className="settings-page" id="main">
         <h1>Settings</h1>
-        <p className="lede">Your graph lives in this browser. Export a backup before switching devices.</p>
+        <p className="lede">
+          Sign in to sync across devices. A local copy stays in this browser; export a backup anytime.
+        </p>
+
+        <section className="note-section">
+          <h2>Account &amp; sync</h2>
+          <AccountPanel />
+        </section>
 
         <section className="note-section">
           <h2>Your profile</h2>

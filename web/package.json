@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@azure/msal-browser": "^4.30.0",
+    "@supabase/supabase-js": "^2.110.7",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",
