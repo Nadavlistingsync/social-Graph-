@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
-import { clearAwaitingContactStep, isAwaitingContactStep } from './lib/onboardingFlow'
+import {
+  clearAwaitingContactStep,
+  isAwaitingContactStep,
+} from './lib/onboardingFlow'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
 import { Onboarding } from './views/Onboarding'
@@ -14,13 +17,23 @@ import { PathFinder } from './views/PathFinder'
 import { Settings } from './views/Settings'
 
 function AppRoutes() {
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, version: authVersion } = useAuth()
   const { isOnboarded } = useGraph()
   const [awaitingContacts, setAwaitingContacts] = useState(isAwaitingContactStep)
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      clearAwaitingContactStep()
+      setAwaitingContacts(false)
+      return
+    }
+    setAwaitingContacts(isAwaitingContactStep())
+  }, [isLoggedIn, authVersion])
 
   if (!isLoggedIn || !isOnboarded || awaitingContacts) {
     return (
       <Onboarding
+        key={isLoggedIn ? `in-${authVersion}` : `out-${authVersion}`}
         contactsOnly={isLoggedIn && isOnboarded && awaitingContacts}
         onWorkspaceCreated={() => setAwaitingContacts(true)}
         onEnterApp={() => {
