@@ -1078,6 +1078,24 @@ button {
   flex-shrink: 0;
 }
 
+.auth-switch {
+  margin: 1.25rem 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.text-btn.inline {
+  display: inline;
+  color: var(--link);
+  font-size: inherit;
+  padding: 0;
+}
+
+.text-btn.inline:hover {
+  text-decoration: underline;
+}
+
 .onboarding-choice {
   border: none;
   margin: 0 0 1.25rem;

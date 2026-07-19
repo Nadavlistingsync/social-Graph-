@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shell } from '../components/Shell'
 import { contactAuthStatus } from '../components/ContactAuthPanel'
+import { useAuth } from '../context/AuthContext'
 import { useContactImport } from '../context/ContactImportContext'
 import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
@@ -10,9 +11,11 @@ import {
   getOAuthUserConfig,
   saveOAuthUserConfig,
 } from '../lib/oauthConfig'
+import { clearAwaitingContactStep, clearFirstRunPending } from '../lib/onboardingFlow'
 
 export function Settings() {
   const { profile, updateProfile, setLoadSample, resetAll } = useGraph()
+  const { account, logOut, updateName, changePassword } = useAuth()
   const { openImport } = useContactImport()
   const { exportData, importData } = usePreferences()
   const [name, setName] = useState(profile.name)
@@ -21,12 +24,19 @@ export function Settings() {
   const [googleClientId, setGoogleClientId] = useState(oauth.googleClientId ?? '')
   const [microsoftClientId, setMicrosoftClientId] = useState(oauth.microsoftClientId ?? '')
   const authStatus = contactAuthStatus()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordBusy, setPasswordBusy] = useState(false)
 
   useDocumentTitle('Settings')
 
   function saveProfile(e: React.FormEvent) {
     e.preventDefault()
-    updateProfile({ name: name.trim() || profile.name, summary: summary.trim() })
+    const nextName = name.trim() || profile.name
+    updateProfile({ name: nextName, summary: summary.trim() })
+    updateName(nextName)
   }
 
   function handleImport(file: File) {
@@ -48,11 +58,82 @@ export function Settings() {
     }
   }
 
+  function handleLogOut() {
+    clearAwaitingContactStep()
+    clearFirstRunPending()
+    logOut()
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPasswordError('')
+    setPasswordMessage('')
+    setPasswordBusy(true)
+    const result = await changePassword({ currentPassword, newPassword })
+    setPasswordBusy(false)
+    if (!result.ok) {
+      setPasswordError(result.error)
+      return
+    }
+    setCurrentPassword('')
+    setNewPassword('')
+    setPasswordMessage('Password updated.')
+  }
+
   return (
     <Shell active="settings">
       <div className="settings-page" id="main">
         <h1>Settings</h1>
-        <p className="lede">Your graph lives in this browser. Export a backup before switching devices.</p>
+        <p className="lede">
+          Signed in as {account?.email}. Your graph is stored on this device under your account.
+          Export a backup before switching devices.
+        </p>
+
+        <section className="note-section">
+          <h2>Account</h2>
+          <p className="section-hint">{account?.email}</p>
+          <button type="button" className="chip" onClick={handleLogOut}>
+            Log out
+          </button>
+          <form onSubmit={handleChangePassword} style={{ marginTop: '1rem' }}>
+            <div className="field">
+              <label className="field-label" htmlFor="current-password">
+                Current password
+              </label>
+              <input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="new-password">
+                New password
+              </label>
+              <input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
+              />
+            </div>
+            {passwordError && <p className="form-error">{passwordError}</p>}
+            {passwordMessage && <p className="section-hint">{passwordMessage}</p>}
+            <button
+              type="submit"
+              className="chip on"
+              disabled={passwordBusy || !currentPassword || newPassword.length < 8}
+            >
+              {passwordBusy ? 'Updating…' : 'Change password'}
+            </button>
+          </form>
+        </section>
 
         <section className="note-section">
           <h2>Your profile</h2>

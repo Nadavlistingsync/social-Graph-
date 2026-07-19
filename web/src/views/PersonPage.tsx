@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { getYouId } from '../data/graphStore'
+import { notesStorageKey } from '../data/preferences'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import { Shell } from '../components/Shell'
 import { AddConnectionModal } from '../components/GraphModals'
@@ -18,7 +19,7 @@ export function PersonPage() {
   const { version, getWarmth, setWarmth, isAwkward, setAwkward } = usePreferences()
   const [connOpen, setConnOpen] = useState(false)
   const node = getNode(id)
-  const storageKey = `sg-notes-${id}`
+  const storageKey = notesStorageKey(id)
 
   useDocumentTitle(node?.name)
 

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -16,6 +17,7 @@ import {
   saveWarmthOverride,
   type WarmthOverride,
 } from '../data/preferences'
+import { useAuth } from './AuthContext'
 
 type PreferencesContextValue = {
   version: number
@@ -30,11 +32,17 @@ type PreferencesContextValue = {
 const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
+  const { version: authVersion } = useAuth()
   const [version, setVersion] = useState(0)
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
+  useEffect(() => {
+    bump()
+  }, [authVersion, bump])
+
   const value = useMemo<PreferencesContextValue>(() => {
     void version
+    void authVersion
     const warmthOverrides = loadWarmthOverrides()
     const awkwardEdges = loadAwkwardEdges()
 
@@ -61,7 +69,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         return result
       },
     }
-  }, [version, bump])
+  }, [version, authVersion, bump])
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>
 }
