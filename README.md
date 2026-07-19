@@ -10,18 +10,22 @@ Hard-refresh if you still see an old 404 (`Cmd/Ctrl + Shift + R`).
 
 ## Cloud sync (Supabase)
 
-Set on Vercel (and optionally in `web/.env.local`):
+Already provisioned: private Storage bucket `user-graphs` + `/api/graph` sync endpoint.
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY` (anon JWT or `sb_publishable_…`)
+**Vercel env vars**
 
-Apply the schema once: paste [`supabase/migrations/001_user_graphs.sql`](./supabase/migrations/001_user_graphs.sql) into the Supabase SQL Editor, **or** run with your secret key:
+Client (Vite):
+- `VITE_SUPABASE_URL=https://YOUR_REF.supabase.co`
+- `VITE_SUPABASE_ANON_KEY=` (anon JWT)
 
-```bash
-SUPABASE_URL=https://YOUR_REF.supabase.co SUPABASE_SECRET_KEY=sb_secret_… node web/scripts/apply-schema.mjs
-```
+Server (API — never use `VITE_` for the service role):
+- `SUPABASE_URL=` (same URL)
+- `SUPABASE_SERVICE_ROLE_KEY=` (service_role JWT)
 
 In Supabase Auth → URL configuration, add your Vercel origin to **Redirect URLs**.
+For smoother signup, you can disable **Confirm email** under Auth providers.
+
+Optional Postgres table (not required for sync): [`supabase/migrations/001_user_graphs.sql`](./supabase/migrations/001_user_graphs.sql).
 
 ## Local
 
