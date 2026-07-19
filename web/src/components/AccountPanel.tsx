@@ -82,7 +82,7 @@ export function AccountPanel({ compact = false }: { compact?: boolean }) {
         }
         const result = await signUpWithPassword(email, password)
         if (!result.ok) setMessage(result.error)
-        else if (result.needsConfirm) setMessage('Check your email to confirm your account.')
+        else if (result.needsConfirm) setMessage('Check your email to confirm your account, then log in.')
         else setMessage('Account created — you’re signed in.')
         return
       }

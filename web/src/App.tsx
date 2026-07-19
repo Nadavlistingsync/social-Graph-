@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
@@ -12,7 +12,20 @@ import { PathFinder } from './views/PathFinder'
 import { Settings } from './views/Settings'
 
 function AppRoutes() {
+  const { ready: authReady } = useAuth()
   const { isOnboarded } = useGraph()
+
+  if (!authReady) {
+    return (
+      <div className="onboarding">
+        <div className="onboarding-card" id="main">
+          <div className="brand-mark">Social Graph</div>
+          <p className="lede">Loading…</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!isOnboarded) return <Onboarding />
 
   return (
