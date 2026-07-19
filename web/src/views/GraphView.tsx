@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { getYouId } from '../data/graphStore'
-import { findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import { getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
 import { useGraph } from '../context/GraphContext'
@@ -22,21 +22,31 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 type SimNode = GraphNode & SimulationNodeDatum
 type SimLink = { source: string | SimNode; target: string | SimNode; edge: GraphEdge }
+type Layer = 'mine' | 'extended'
 
 const WEAK_THRESHOLD = 0.35
 const YOU_ID = getYouId()
 
 function nodeFill(n: GraphNode): string {
-  if (n.id === YOU_ID) return 'var(--you)'
-  if (n.type === 'person') return '#b8c4d4'
-  if (n.type === 'company') return '#8fa3b8'
-  return '#9a8f7a'
+  if (n.id === YOU_ID) return '#0a6b52'
+  if (n.type === 'person') return n.knownByUser ? '#2f3b4d' : '#7a8799'
+  if (n.type === 'company') return '#5a6b80'
+  return '#8a8278'
 }
 
 function nodeRadius(n: GraphNode): number {
-  if (n.id === YOU_ID) return 14
-  if (n.type === 'person') return n.knownByUser ? 11 : 9
+  if (n.id === YOU_ID) return 16
+  if (n.type === 'person') return n.knownByUser ? 12 : 9
   return 7
+}
+
+function neighborsOf(id: string, edges: GraphEdge[]): Set<string> {
+  const out = new Set<string>()
+  for (const e of edges) {
+    if (e.source === id) out.add(e.target)
+    if (e.target === id) out.add(e.source)
+  }
+  return out
 }
 
 function fitToNodes(
@@ -77,70 +87,75 @@ function fitToNodes(
 
 export function GraphView() {
   const navigate = useNavigate()
-  const { nodes, edges, version } = useGraph()
-  const { version: prefVersion } = usePreferences()
+  const { nodes, edges, version, youId } = useGraph()
+  const { version: prefVersion, getWarmth } = usePreferences()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
-  const [hideWeak, setHideWeak] = useState(true)
+  const [layer, setLayer] = useState<Layer>('mine')
   const [fitTick, setFitTick] = useState(0)
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const nodesRef = useRef<SimNode[]>([])
   const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
 
+  useDocumentTitle('Network')
+
   useEffect(() => {
     setSelectedId(focusId)
   }, [focusId])
 
-  const filteredEdges = useMemo(() => {
+  const strongEdges = useMemo(() => {
     void version
     void prefVersion
-    return edges.filter((e) => {
-      if (e.type === 'weak public mention' && hideWeak) return false
-      if (hideWeak && e.strength < WEAK_THRESHOLD) return false
-      return true
-    })
-  }, [edges, hideWeak, version, prefVersion])
+    return edges.filter((e) => e.type !== 'weak public mention' && e.strength >= WEAK_THRESHOLD)
+  }, [edges, version, prefVersion])
 
-  const activeNodeIds = useMemo(() => {
-    const ids = new Set<string>()
-    filteredEdges.forEach((e) => {
-      ids.add(e.source)
-      ids.add(e.target)
-    })
-    ids.add(YOU_ID)
+  const myPeople = useMemo(() => {
+    void version
+    void prefVersion
+    const direct = neighborsOf(YOU_ID, strongEdges)
+    // Also treat warmth “I know them” as first-degree even without an edge yet
+    for (const n of nodes) {
+      if (n.id === YOU_ID || n.type !== 'person') continue
+      const w = getWarmth(n)
+      if (w.knownByUser) direct.add(n.id)
+    }
+    return direct
+  }, [strongEdges, nodes, version, prefVersion, getWarmth])
+
+  const visibleNodeIds = useMemo(() => {
+    const ids = new Set<string>([YOU_ID])
+    for (const id of myPeople) ids.add(id)
+    if (layer === 'extended') {
+      for (const id of myPeople) {
+        for (const n2 of neighborsOf(id, strongEdges)) {
+          if (n2 !== YOU_ID) ids.add(n2)
+        }
+      }
+    }
     ids.add(selectedId)
     return ids
-  }, [filteredEdges, selectedId])
+  }, [myPeople, strongEdges, layer, selectedId])
+
+  const filteredEdges = useMemo(() => {
+    return strongEdges.filter(
+      (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target),
+    )
+  }, [strongEdges, visibleNodeIds])
 
   const graphNodes = useMemo(
-    () => nodes.filter((n) => activeNodeIds.has(n.id)),
-    [nodes, activeNodeIds],
+    () => nodes.filter((n) => visibleNodeIds.has(n.id)),
+    [nodes, visibleNodeIds],
   )
 
   const selected = getNode(selectedId)
-  const selectedEdges = selected
-    ? getEdgesForNode(selected.id).filter((e) => !hideWeak || e.strength >= WEAK_THRESHOLD)
-    : []
-
-  useDocumentTitle('Graph')
-
-  const { pathNodeIds, pathEdgeIds } = useMemo(() => {
+  const selectedEdges = useMemo(() => {
     void version
-    const empty = { pathNodeIds: new Set<string>(), pathEdgeIds: new Set<string>() }
-    if (selectedId === YOU_ID) return empty
-    const paths = findPaths(selectedId, {
-      maxDepth: 5,
-      maxPaths: 3,
-      minStrength: hideWeak ? WEAK_THRESHOLD : 0.15,
-    })
-    if (!paths.length) return empty
-    return {
-      pathNodeIds: new Set(paths[0].nodeIds),
-      pathEdgeIds: new Set(paths[0].hops.map((h) => h.edge.id)),
-    }
-  }, [selectedId, hideWeak, version])
+    if (!selected) return []
+    const ids = new Set(filteredEdges.map((e) => e.id))
+    return getEdgesForNode(selected.id).filter((e) => ids.has(e.id))
+  }, [selected, filteredEdges, version])
 
   useEffect(() => {
     const svgEl = svgRef.current
@@ -149,53 +164,45 @@ export function GraphView() {
 
     const width = svgEl.clientWidth || 800
     const height = svgEl.clientHeight || 600
-
     const simNodes: SimNode[] = graphNodes.map((n) => ({ ...n }))
     nodesRef.current = simNodes
-    const simLinks: SimLink[] = filteredEdges
-      .filter((e) => activeNodeIds.has(e.source) && activeNodeIds.has(e.target))
-      .map((e) => ({ source: e.source, target: e.target, edge: e }))
+    const simLinks: SimLink[] = filteredEdges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      edge,
+    }))
 
-    const simulation = forceSimulation<SimNode>(simNodes)
+    select(gEl).selectAll('*').remove()
+
+    const simulation = forceSimulation(simNodes)
       .force(
         'link',
         forceLink<SimNode, SimLink>(simLinks)
           .id((d) => d.id)
-          .distance((l) => 80 + (1 - l.edge.strength) * 60)
-          .strength((l) => 0.2 + l.edge.strength * 0.5),
+          .distance((d) => (d.edge.strength > 0.7 ? 70 : 110))
+          .strength(0.55),
       )
       .force('charge', forceManyBody().strength(-220))
       .force('center', forceCenter(width / 2, height / 2))
       .force(
         'collide',
-        forceCollide<SimNode>().radius((d) => nodeRadius(d) + 8),
+        forceCollide<SimNode>().radius((d) => nodeRadius(d) + 10),
       )
 
-    const g = select(gEl)
-    g.selectAll('*').remove()
-
-    const link = g
+    const link = select(gEl)
       .append('g')
+      .attr('stroke-linecap', 'round')
       .selectAll('line')
       .data(simLinks)
       .join('line')
-      .attr('stroke', (d) => {
-        if (pathEdgeIds.has(d.edge.id)) return '#c4a35a'
-        return d.edge.strength < WEAK_THRESHOLD
-          ? '#3d4455'
-          : `rgba(154, 149, 140, ${0.25 + d.edge.strength * 0.55})`
-      })
-      .attr('stroke-width', (d) =>
-        pathEdgeIds.has(d.edge.id)
-          ? Math.max(2.5, d.edge.strength * 5)
-          : Math.max(0.6, d.edge.strength * 4.5),
+      .attr('stroke', (d) =>
+        d.edge.source === YOU_ID || d.edge.target === YOU_ID
+          ? '#0a6b52'
+          : `rgba(47, 59, 77, ${0.2 + d.edge.strength * 0.45})`,
       )
-      .attr('stroke-opacity', (d) => {
-        if (!pathEdgeIds.size) return d.edge.strength < WEAK_THRESHOLD ? 0.35 : 0.75
-        return pathEdgeIds.has(d.edge.id) ? 0.95 : 0.12
-      })
+      .attr('stroke-width', (d) => (d.edge.source === YOU_ID || d.edge.target === YOU_ID ? 2.2 : 1.4))
 
-    const nodeG = g
+    const nodeG = select(gEl)
       .append('g')
       .selectAll('g')
       .data(simNodes)
@@ -223,26 +230,19 @@ export function GraphView() {
       .append('circle')
       .attr('r', (d) => nodeRadius(d))
       .attr('fill', (d) => nodeFill(d))
-      .attr('stroke', (d) => (d.id === selectedId ? '#c4a35a' : 'transparent'))
-      .attr('stroke-width', 2.5)
-      .attr('opacity', (d) => {
-        if (!pathNodeIds.size) return 1
-        return pathNodeIds.has(d.id) || d.id === selectedId ? 1 : 0.2
-      })
-      .attr('class', (d) => (d.id === YOU_ID ? 'node-you' : ''))
+      .attr('stroke', (d) => (d.id === selectedId ? '#0a6b52' : 'transparent'))
+      .attr('stroke-width', 3)
+      .attr('class', (d) => (d.id === youId ? 'node-you' : ''))
 
     nodeG
       .append('text')
       .text((d) => d.name)
-      .attr('x', (d) => nodeRadius(d) + 4)
-      .attr('y', 3)
-      .attr('fill', '#e8e6e3')
-      .attr('font-size', 10)
-      .attr('font-family', 'IBM Plex Sans, sans-serif')
-      .attr('opacity', (d) => {
-        if (!pathNodeIds.size) return 0.85
-        return pathNodeIds.has(d.id) || d.id === selectedId ? 0.95 : 0.15
-      })
+      .attr('x', (d) => nodeRadius(d) + 5)
+      .attr('y', 4)
+      .attr('fill', '#12161f')
+      .attr('font-size', 12)
+      .attr('font-family', 'Figtree, sans-serif')
+      .attr('font-weight', 500)
 
     nodeG.on('click', (event, d) => {
       event.stopPropagation()
@@ -282,7 +282,7 @@ export function GraphView() {
       simulation.stop()
       zoomRef.current = null
     }
-  }, [graphNodes, filteredEdges, activeNodeIds, selectedId, pathNodeIds, pathEdgeIds, navigate, setParams])
+  }, [graphNodes, filteredEdges, selectedId, navigate, setParams, youId])
 
   useEffect(() => {
     if (!fitTick) return
@@ -300,66 +300,84 @@ export function GraphView() {
 
   return (
     <Shell active="graph">
-      <div className="graph-layout" id="main">
+      <div className="graph-layout" id="main-graph">
         <div className="graph-canvas-wrap">
           <div className="graph-toolbar">
-            <button
-              type="button"
-              className={`chip ${hideWeak ? 'on' : ''}`}
-              onClick={() => setHideWeak((v) => !v)}
-            >
-              {hideWeak ? 'Strong links only' : 'Show weak links'}
-            </button>
+            <div className="layer-toggle" role="group" aria-label="Network depth">
+              <button
+                type="button"
+                className={`chip ${layer === 'mine' ? 'on' : ''}`}
+                onClick={() => setLayer('mine')}
+              >
+                My network
+              </button>
+              <button
+                type="button"
+                className={`chip ${layer === 'extended' ? 'on' : ''}`}
+                onClick={() => setLayer('extended')}
+              >
+                Their network
+              </button>
+            </div>
             <button type="button" className="chip" onClick={() => setFitTick((n) => n + 1)}>
               Fit
             </button>
           </div>
-          <svg ref={svgRef} role="img" aria-label="Relationship graph">
+          <svg ref={svgRef} role="img" aria-label="Your network map">
             <g ref={gRef} />
           </svg>
-          <div className="graph-hint">Scroll to zoom · click a node · double-click for note</div>
+          <div className="graph-hint">
+            {layer === 'mine'
+              ? 'People you know · pinch to zoom · tap someone'
+              : 'People your people know · pinch to zoom · tap someone'}
+          </div>
         </div>
         <aside className="side-panel">
           {selected ? (
             <>
               <div>
-                <div className="panel-label">Selected</div>
+                <div className="panel-label">
+                  {selected.id === YOU_ID
+                    ? 'You'
+                    : myPeople.has(selected.id)
+                      ? 'In your network'
+                      : 'In their network'}
+                </div>
                 <h2 className="panel-title">{selected.name}</h2>
                 <div className="panel-type">{NODE_TYPE_LABEL[selected.type]}</div>
                 <p className="panel-body">{selected.summary}</p>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  style={{ marginTop: '1rem' }}
-                  onClick={() => navigate(`/person/${selected.id}`)}
-                >
-                  Open
-                </button>
-                {selected.type === 'person' && selected.id !== YOU_ID && (
+                <div className="panel-actions">
                   <button
                     type="button"
-                    className="chip"
-                    style={{ marginTop: '0.5rem', width: '100%' }}
-                    onClick={() => navigate(`/?to=${selected.id}`)}
+                    className="btn-primary"
+                    onClick={() => navigate(`/person/${selected.id}`)}
                   >
-                    Find path here
+                    Open
                   </button>
-                )}
+                  {selected.type === 'person' && selected.id !== YOU_ID && (
+                    <button
+                      type="button"
+                      className="btn-quiet"
+                      onClick={() => navigate(`/find?to=${selected.id}`)}
+                    >
+                      Find intro
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <div className="panel-label">Connected to</div>
                 <div className="edge-list">
                   {selectedEdges.length === 0 && (
-                    <p className="panel-body">No connections at this filter.</p>
+                    <p className="panel-body">No links in this view yet.</p>
                   )}
                   {selectedEdges.map((edge) => {
                     const other = getNode(otherEnd(edge, selected.id))
                     if (!other) return null
-                    const evidence = edge.evidence[0]
                     return (
                       <div
                         key={edge.id}
-                        className={`edge-card ${edge.strength < WEAK_THRESHOLD ? 'weak' : ''}`}
+                        className="edge-card"
                         onClick={() => {
                           setSelectedId(other.id)
                           setParams({ focus: other.id })
@@ -373,17 +391,8 @@ export function GraphView() {
                         role="button"
                         tabIndex={0}
                       >
-                        <div className="etype">
-                          {edge.type} · {Math.round(edge.strength * 100)}
-                        </div>
+                        <div className="etype">{edge.type}</div>
                         <div className="ename">{other.name}</div>
-                        <div className="eevidence">{edge.explanation}</div>
-                        {evidence && (
-                          <div className="eevidence" style={{ marginTop: 4 }}>
-                            {evidence.title}
-                            {evidence.url.startsWith('#') ? ' · illustrative' : ''}
-                          </div>
-                        )}
                       </div>
                     )
                   })}
@@ -391,7 +400,7 @@ export function GraphView() {
               </div>
             </>
           ) : (
-            <p className="panel-body">Click a node</p>
+            <p className="panel-body">Tap someone on the map.</p>
           )}
         </aside>
       </div>

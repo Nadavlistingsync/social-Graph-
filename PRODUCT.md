@@ -6,9 +6,9 @@ Not a CRM. A small relationship map for warm intros.
 
 ## Three screens
 
-1. **Find path** — pick a target → see who to ask first (with scored alternate paths)
-2. **Graph** — look at the network; strong links by default
-3. **Note** — open a person; see why each link exists; mark warmth / awkward intros
+1. **Network** — see people you know, then who they know
+2. **Find** — pick a target → see who to ask for an intro
+3. **Note** — open a person; mark warmth / awkward intros
 
 ## Automatic vs manual
 

@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { searchNodes } from '../data/paths'
 import { useGraph } from '../context/GraphContext'
 import { useContactImport } from '../context/ContactImportContext'
-import { usePreferences } from '../context/PreferencesContext'
 import { AddPersonModal } from './GraphModals'
 
-const links = [
-  { to: '/', label: 'Find path', id: 'paths' as const },
-  { to: '/graph', label: 'Graph', id: 'graph' as const },
+const tabs = [
+  { to: '/', label: 'Network', id: 'graph' as const },
+  { to: '/find', label: 'Find', id: 'paths' as const },
+  { to: '/settings', label: 'Settings', id: 'settings' as const },
 ]
 
 export function Shell({
@@ -25,9 +25,7 @@ export function Shell({
   const [addOpen, setAddOpen] = useState(false)
   const { openImport } = useContactImport()
   const navigate = useNavigate()
-  const importRef = useRef<HTMLInputElement>(null)
   const { profile, version } = useGraph()
-  const { exportData, importData } = usePreferences()
   const results = useMemo(() => {
     void version
     return open && q.trim() ? searchNodes(q).slice(0, 6) : []
@@ -40,80 +38,34 @@ export function Shell({
     setHighlight(0)
   }
 
-  function handleExport() {
-    const blob = new Blob([exportData()], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `social-graph-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  function handleImport(file: File) {
-    file.text().then((raw) => {
-      const result = importData(raw)
-      if (!result.ok) window.alert(result.error)
-      else window.location.reload()
-    })
-  }
-
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">Social Graph</div>
-          <div className="brand-sub">{profile.name ? `Hi, ${profile.name.split(' ')[0]}` : 'Who can intro me?'}</div>
-        </div>
-        <nav className="nav" aria-label="Main">
-          {links.map((l) => (
-            <Link key={l.to} to={l.to} className={active === l.id ? 'active' : undefined}>
-              {l.label}
+      <header className="top-chrome">
+        <Link to="/" className="brand brand-link">
+          <span className="brand-mark">Social Graph</span>
+          <span className="brand-sub">
+            {profile.name ? profile.name.split(' ')[0] : 'Your map'}
+          </span>
+        </Link>
+
+        <nav className="nav-desktop" aria-label="Main">
+          {tabs.map((t) => (
+            <Link key={t.to} to={t.to} className={active === t.id ? 'active' : undefined}>
+              {t.label}
             </Link>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          <button type="button" className="text-btn" onClick={openImport}>
-            Connect contacts
-          </button>
-          <button type="button" className="text-btn" onClick={() => setAddOpen(true)}>
-            + Add person
-          </button>
-          <Link to="/settings" className="text-btn">
-            Settings
-          </Link>
-          <button type="button" className="text-btn" onClick={handleExport}>
-            Export data
-          </button>
-          <button type="button" className="text-btn" onClick={() => importRef.current?.click()}>
-            Import data
-          </button>
-          <input
-            ref={importRef}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) handleImport(file)
-              e.target.value = ''
-            }}
-          />
-        </div>
-      </aside>
-      <div className="main">
-        <header className="topbar">
+
+        <div className="chrome-actions">
           <div className="search-wrap">
             <input
-              placeholder="Search people…"
+              placeholder="Search…"
               value={q}
               role="combobox"
               aria-expanded={open && results.length > 0}
               aria-controls="search-results"
               aria-autocomplete="list"
-              aria-activedescendant={
-                results.length ? `search-option-${highlight}` : undefined
-              }
+              aria-activedescendant={results.length ? `search-option-${highlight}` : undefined}
               onChange={(e) => {
                 setQ(e.target.value)
                 setOpen(true)
@@ -162,15 +114,32 @@ export function Shell({
               </div>
             )}
           </div>
-          <button type="button" className="chip on topbar-add" onClick={() => setAddOpen(true)}>
-            + Add person
+          <button type="button" className="btn-quiet desktop-only" onClick={openImport}>
+            Contacts
           </button>
-        </header>
-        <div className="view-body">{children}</div>
-        <footer className="app-footer">
-          Your graph stays in this browser. Export a backup from Settings before switching devices.
-        </footer>
+          <button type="button" className="btn-primary chrome-add" onClick={() => setAddOpen(true)}>
+            Add
+          </button>
+        </div>
+      </header>
+
+      <div className="main">
+        <div className="view-body" id="main">
+          {children}
+        </div>
       </div>
+
+      <nav className="bottom-nav" aria-label="Primary">
+        {tabs.map((t) => (
+          <Link key={t.to} to={t.to} className={active === t.id ? 'active' : undefined}>
+            {t.label}
+          </Link>
+        ))}
+        <button type="button" className="bottom-add" onClick={() => setAddOpen(true)}>
+          Add
+        </button>
+      </nav>
+
       <AddPersonModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   )
