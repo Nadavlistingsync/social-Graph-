@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { getYouId } from '../data/graphStore'
 import { bestFirstHop, findPaths, getEdgesForNode, getNode, otherEnd } from '../data/paths'
+import { saveNote } from '../data/userDataBlob'
 import { Shell } from '../components/Shell'
 import { AddConnectionModal } from '../components/GraphModals'
 import { useGraph } from '../context/GraphContext'
@@ -39,12 +40,8 @@ export function PersonPage() {
   }, [node, storageKey])
 
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, notes)
-    } catch {
-      /* ignore */
-    }
-  }, [notes, storageKey])
+    saveNote(id, notes)
+  }, [notes, id])
 
   const rels = useMemo(() => {
     void version

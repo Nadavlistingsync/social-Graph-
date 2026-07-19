@@ -8,6 +8,23 @@ Warm-intro map. One question: **who do I know who can get me to this person?**
 
 Hard-refresh if you still see an old 404 (`Cmd/Ctrl + Shift + R`).
 
+## Cloud sync (Supabase)
+
+Secrets stay in **server `.env` / Vercel env** — nothing Supabase-related is bundled into the frontend.
+
+Copy [`.env.example`](./.env.example) → `.env` and fill in:
+
+```bash
+SUPABASE_URL=https://YOUR_REF.supabase.co
+SUPABASE_ANON_KEY=…
+SUPABASE_SERVICE_ROLE_KEY=…
+```
+
+Same three vars on Vercel (Production). Auth + sync go through `/api/auth` and `/api/graph`.
+
+In Supabase Auth → URL configuration, add your Vercel origin to **Redirect URLs**.
+Optional: disable **Confirm email** for smoother signup.
+
 ## Local
 
 ```bash

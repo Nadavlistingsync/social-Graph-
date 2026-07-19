@@ -74,6 +74,12 @@ export function GraphProvider({ children }: { children: ReactNode }) {
     bump()
   }, [bump])
 
+  useEffect(() => {
+    const onReload = () => bump()
+    window.addEventListener('sg-data-reloaded', onReload)
+    return () => window.removeEventListener('sg-data-reloaded', onReload)
+  }, [bump])
+
   const value = useMemo<GraphContextValue>(() => {
     void version
     const profile = getProfile()

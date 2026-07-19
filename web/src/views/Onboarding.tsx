@@ -46,8 +46,8 @@ export function Onboarding() {
         <div className="brand-mark">Social Graph</div>
         <h1>Map your warm intros</h1>
         <p className="lede">
-          One question: who do you know who can get you to someone else? Your graph stays in this
-          browser — no account required.
+          One question: who do you know who can get you to someone else? Start in this browser —
+          sign in later under Settings to sync to the cloud.
         </p>
 
         <form onSubmit={startGraph}>

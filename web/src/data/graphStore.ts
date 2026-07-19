@@ -2,6 +2,7 @@ import { demoEdges, demoNodes } from './seed'
 import { importContactsIntoWorkspace, type ContactImportResult } from './contactImportBatch'
 import type { ParsedContact } from './contactImport'
 import type { GraphEdge, GraphNode } from './types'
+import { notifyUserDataChanged } from './syncBus'
 
 export const YOU_ID = 'you'
 const WORKSPACE_KEY = 'sg-workspace-v2'
@@ -46,12 +47,13 @@ function readWorkspace(): Workspace {
   }
 }
 
-function writeWorkspace(ws: Workspace): void {
+function writeWorkspace(ws: Workspace, options?: { silent?: boolean }): void {
   try {
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(ws))
   } catch {
     /* ignore */
   }
+  if (!options?.silent) notifyUserDataChanged()
 }
 
 export function getYouId(): string {
@@ -184,8 +186,8 @@ export function loadWorkspaceState(): Workspace {
   return readWorkspace()
 }
 
-export function saveWorkspaceState(ws: Workspace): void {
-  writeWorkspace(ws)
+export function saveWorkspaceState(ws: Workspace, options?: { silent?: boolean }): void {
+  writeWorkspace(ws, options)
 }
 
 export function resetWorkspace(): void {
@@ -200,6 +202,7 @@ export function resetWorkspace(): void {
   } catch {
     /* ignore */
   }
+  notifyUserDataChanged()
 }
 
 /** Migrate legacy single-user demo (nadav) to workspace v2 on first load. */
