@@ -12,6 +12,8 @@ export type WorkspaceProfile = {
   summary: string
   onboarded: boolean
   loadSample: boolean
+  /** Who you're trying to meet — sets pathfinding intent */
+  targetPerson?: string
 }
 
 export type Workspace = {
@@ -116,7 +118,7 @@ export function slugify(name: string, existingIds: Set<string>): string {
   return id
 }
 
-export function completeOnboarding(name: string, loadSample: boolean): void {
+export function completeOnboarding(name: string, loadSample: boolean, targetPerson?: string): void {
   const trimmed = name.trim()
   if (!trimmed) return
   writeWorkspace({
@@ -125,6 +127,7 @@ export function completeOnboarding(name: string, loadSample: boolean): void {
       summary: defaultWorkspace().profile.summary,
       onboarded: true,
       loadSample,
+      targetPerson: targetPerson?.trim() || undefined,
     },
     customNodes: [],
     customEdges: [],

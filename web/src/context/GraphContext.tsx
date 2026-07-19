@@ -35,7 +35,7 @@ type GraphContextValue = {
   isOnboarded: boolean
   nodes: GraphNode[]
   edges: GraphEdge[]
-  finishOnboarding: (name: string, loadSample: boolean) => void
+  finishOnboarding: (name: string, loadSample: boolean, targetPerson?: string) => void
   updateProfile: (patch: Partial<WorkspaceProfile>) => void
   setLoadSample: (loadSample: boolean) => void
   addPerson: (
@@ -58,7 +58,7 @@ type GraphContextValue = {
   importContacts: (
     contacts: ParsedContact[],
   ) =>
-    | { ok: true; imported: number; skipped: number }
+    | { ok: true; imported: number; skipped: number; merged: number; warmthIds: string[] }
     | { ok: false; error: string }
   resetAll: () => void
 }
@@ -90,8 +90,8 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       isOnboarded: isOnboarded(),
       nodes: getNodes(),
       edges: getEdges(),
-      finishOnboarding: (name, loadSample) => {
-        completeOnboarding(name, loadSample)
+      finishOnboarding: (name, loadSample, targetPerson) => {
+        completeOnboarding(name, loadSample, targetPerson)
         bump()
       },
       updateProfile: (patch) => {
@@ -169,11 +169,15 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       importContacts: (contacts) => {
         const result = storeImportContacts(contacts)
         if (!result.ok) return result
-        for (const id of result.warmthIds) {
-          saveWarmthOverride(id, { knownByUser: true, warmth: 0.75 })
-        }
+        // Don't auto-mark everyone as known — rating step sets warmth.
         bump()
-        return { ok: true, imported: result.imported, skipped: result.skipped }
+        return {
+          ok: true,
+          imported: result.imported,
+          skipped: result.skipped,
+          merged: result.merged,
+          warmthIds: result.warmthIds,
+        }
       },
       resetAll: () => {
         resetWorkspace()

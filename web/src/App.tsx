@@ -6,9 +6,10 @@ import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
-import { Onboarding } from './views/Onboarding'
+import { isContactsGateOpen, Onboarding } from './views/Onboarding'
 import { PersonPage } from './views/PersonPage'
 import { PathFinder } from './views/PathFinder'
+import { RateContacts } from './views/RateContacts'
 import { Settings } from './views/Settings'
 
 function AppRoutes() {
@@ -26,12 +27,14 @@ function AppRoutes() {
     )
   }
 
-  if (!isOnboarded) return <Onboarding />
+  // Contacts / rate steps run after finishOnboarding so imports + scoring can write.
+  if (!isOnboarded || isContactsGateOpen()) return <Onboarding />
 
   return (
     <Routes>
       <Route path="/" element={<GraphView />} />
       <Route path="/find" element={<PathFinder />} />
+      <Route path="/rate" element={<RateContacts />} />
       <Route path="/graph" element={<Navigate to="/" replace />} />
       <Route path="/person/:id" element={<PersonPage />} />
       <Route path="/settings" element={<Settings />} />
@@ -47,14 +50,14 @@ export default function App() {
       <AuthProvider>
         <GraphProvider>
           <PreferencesProvider>
-            <ContactImportProvider>
-              <BrowserRouter>
+            <BrowserRouter>
+              <ContactImportProvider>
                 <a href="#main" className="skip-link">
                   Skip to content
                 </a>
                 <AppRoutes />
-              </BrowserRouter>
-            </ContactImportProvider>
+              </ContactImportProvider>
+            </BrowserRouter>
           </PreferencesProvider>
         </GraphProvider>
       </AuthProvider>

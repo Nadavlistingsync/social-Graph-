@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { detectAndParseContacts } from '../data/contactImport'
+import { detectAndParseContacts, parsePastedContacts } from '../data/contactImport'
 import { useGraph } from '../context/GraphContext'
 import { pickDeviceContacts, isDevicePickerAvailable } from '../lib/deviceContacts'
 import { fetchGoogleContacts } from '../lib/googleContacts'
@@ -14,7 +14,7 @@ import {
 import { OAuthSetupSheet } from './OAuthSetupSheet'
 
 type ContactAuthPanelProps = {
-  onSuccess?: (imported: number, skipped: number) => void
+  onSuccess?: (imported: number, skipped: number, warmthIds: string[]) => void
   onSkip?: () => void
   showSkip?: boolean
   compact?: boolean
@@ -28,20 +28,28 @@ export function ContactAuthPanel({
 }: ContactAuthPanelProps) {
   const { importContacts } = useGraph()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [loading, setLoading] = useState<'google' | 'microsoft' | 'device' | 'file' | null>(null)
+  const [loading, setLoading] = useState<'google' | 'microsoft' | 'device' | 'file' | 'paste' | null>(
+    null,
+  )
   const [error, setError] = useState('')
-  const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null)
+  const [result, setResult] = useState<{
+    imported: number
+    skipped: number
+    merged: number
+  } | null>(null)
   const [setupProvider, setSetupProvider] = useState<'google' | 'microsoft' | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
 
   const googleReady = isGoogleContactsAvailable()
   const microsoftReady = isMicrosoftContactsAvailable()
   const deviceReady = isDevicePickerAvailable()
 
-  function finish(imported: number, skipped: number) {
-    setResult({ imported, skipped })
+  function finish(imported: number, skipped: number, merged: number, warmthIds: string[]) {
+    setResult({ imported, skipped, merged })
     setLoading(null)
-    onSuccess?.(imported, skipped)
+    onSuccess?.(imported + merged, skipped, warmthIds)
   }
 
   async function runImport(
@@ -64,7 +72,7 @@ export function ContactAuthPanel({
         setLoading(null)
         return
       }
-      finish(res.imported, res.skipped)
+      finish(res.imported, res.skipped, res.merged, res.warmthIds)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import failed')
       setLoading(null)
@@ -94,6 +102,8 @@ export function ContactAuthPanel({
     try {
       let imported = 0
       let skipped = 0
+      let merged = 0
+      const warmthIds: string[] = []
       let sawFile = false
       for (const file of files.filter(isContactsFile)) {
         sawFile = true
@@ -103,6 +113,8 @@ export function ContactAuthPanel({
         if (res.ok) {
           imported += res.imported
           skipped += res.skipped
+          merged += res.merged
+          warmthIds.push(...res.warmthIds)
         }
       }
       if (!sawFile) {
@@ -110,16 +122,39 @@ export function ContactAuthPanel({
         setLoading(null)
         return
       }
-      if (!imported) {
-        setError('No contacts found in that file. For LinkedIn, upload Connections.csv from the unzipped export.')
+      if (!imported && !merged) {
+        setError(
+          'No contacts found in that file. For LinkedIn, upload Connections.csv from the unzipped export.',
+        )
         setLoading(null)
         return
       }
-      finish(imported, skipped)
+      finish(imported, skipped, merged, warmthIds)
     } catch {
       setError('Could not read file')
       setLoading(null)
     }
+  }
+
+  function handlePaste() {
+    setError('')
+    setResult(null)
+    setLoading('paste')
+    const contacts = parsePastedContacts(pasteText)
+    if (!contacts.length) {
+      setError('Paste one name per line, optionally with an email.')
+      setLoading(null)
+      return
+    }
+    const res = importContacts(contacts)
+    if (!res.ok) {
+      setError(res.error)
+      setLoading(null)
+      return
+    }
+    setPasteText('')
+    setPasteOpen(false)
+    finish(res.imported, res.skipped, res.merged, res.warmthIds)
   }
 
   const onDrop = useCallback(
@@ -135,10 +170,14 @@ export function ContactAuthPanel({
   if (result) {
     return (
       <div className="import-result">
-        <strong>Imported {result.imported} contacts</strong>
+        <strong>
+          Added {result.imported}
+          {result.merged ? ` · merged ${result.merged}` : ''} contacts
+        </strong>
         {result.skipped > 0 && (
-          <p className="section-hint">Skipped {result.skipped} duplicates already in your graph.</p>
+          <p className="section-hint">Skipped {result.skipped} incomplete rows.</p>
         )}
+        <p className="section-hint">Next: score how well you know them.</p>
       </div>
     )
   }
@@ -190,6 +229,35 @@ export function ContactAuthPanel({
         </button>
       </div>
 
+      <button
+        type="button"
+        className="auth-btn device"
+        disabled={Boolean(loading)}
+        onClick={() => setPasteOpen((v) => !v)}
+      >
+        {pasteOpen ? 'Hide paste list' : 'Paste a list of names'}
+      </button>
+
+      {pasteOpen && (
+        <div className="paste-contacts">
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={5}
+            placeholder={'Alex Chen, alex@acme.com\nSam Rivera\nJordan Lee <jordan@example.com>'}
+            aria-label="Paste contacts"
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={Boolean(loading) || !pasteText.trim()}
+            onClick={handlePaste}
+          >
+            {loading === 'paste' ? 'Importing…' : 'Import pasted contacts'}
+          </button>
+        </div>
+      )}
+
       <div className="auth-divider">
         <span>or upload a file</span>
       </div>
@@ -236,7 +304,7 @@ export function ContactAuthPanel({
       </details>
 
       <p className="section-hint auth-hint">
-        Names and emails only. Stays in this browser (and syncs if you’re signed in).
+        Names and emails only. Stays private to you (and syncs if you’re signed in).
       </p>
 
       {error && <p className="form-error">{error}</p>}

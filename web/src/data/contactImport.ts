@@ -6,6 +6,7 @@ export type ContactSource =
   | 'google-api'
   | 'microsoft-api'
   | 'device-picker'
+  | 'paste'
 
 export type ParsedContact = {
   name: string
@@ -292,7 +293,41 @@ export function detectAndParseContacts(raw: string, filename?: string): ParsedCo
   }
 
   if (trimmed.includes('BEGIN:VCARD')) return parseVcard(raw)
-  return []
+  return parsePastedContacts(raw)
+}
+
+/** Paste lines like `Name` or `Name, email@x.com` or `Name <email@x.com>`. */
+export function parsePastedContacts(raw: string): ParsedContact[] {
+  const contacts: ParsedContact[] = []
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    let name = trimmed
+    let email: string | undefined
+
+    const angle = trimmed.match(/^(.+?)\s*<([\w.+-]+@[\w.-]+\.\w+)>\s*$/)
+    if (angle) {
+      name = angle[1].trim()
+      email = angle[2].toLowerCase()
+    } else {
+      const comma = trimmed.split(',').map((s) => s.trim())
+      if (comma.length >= 2 && /@/.test(comma[comma.length - 1] || '')) {
+        email = comma[comma.length - 1].toLowerCase()
+        name = comma.slice(0, -1).join(', ')
+      } else {
+        const spaced = trimmed.match(/^(.+?)\s+([\w.+-]+@[\w.-]+\.\w+)\s*$/)
+        if (spaced) {
+          name = spaced[1].trim()
+          email = spaced[2].toLowerCase()
+        }
+      }
+    }
+
+    name = name.replace(/^["']|["']$/g, '').trim()
+    if (name.length < 2) continue
+    contacts.push({ name, email, source: 'paste' })
+  }
+  return contacts
 }
 
 export function buildContactSummary(c: ParsedContact): string {
@@ -313,7 +348,9 @@ export function buildContactSummary(c: ParsedContact): string {
                 ? 'LinkedIn connections'
                 : c.source === 'vcard'
                   ? 'Apple Contacts'
-                  : 'Contacts export'
+                  : c.source === 'paste'
+                    ? 'pasted list'
+                    : 'Contacts export'
   return `Imported from ${label}.`
 }
 
@@ -333,5 +370,7 @@ export function sourceLabel(source: ContactSource): string {
       return 'LinkedIn Connections'
     case 'vcard':
       return 'Apple Contacts (vCard)'
+    case 'paste':
+      return 'Pasted contacts'
   }
 }

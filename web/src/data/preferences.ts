@@ -1,7 +1,16 @@
 import { loadWorkspaceState, saveWorkspaceState, type Workspace } from './graphStore'
 import { notifyUserDataChanged } from './syncBus'
 
-export type WarmthOverride = { knownByUser: boolean; warmth: number }
+export type WarmthOverride = {
+  knownByUser: boolean
+  warmth: number
+  /** 1–10 how well you know them */
+  score?: number
+  reason?: string
+  source?: 'ai' | 'user' | 'heuristic' | 'import'
+  confirmed?: boolean
+  ratedAt?: string
+}
 
 const WARMTH_KEY = 'sg-warmth-v1'
 const AWKWARD_KEY = 'sg-awkward-edges-v1'
