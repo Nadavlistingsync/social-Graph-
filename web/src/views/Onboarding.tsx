@@ -26,13 +26,14 @@ export function Onboarding() {
       <div className="onboarding">
         <div className="onboarding-card onboarding-wide" id="main">
           <div className="brand-mark">Social Graph</div>
-          <h1>Who do you know?</h1>
+          <h1>Add people you know</h1>
           <p className="lede">
-            Connect Google or Apple Contacts, or upload a LinkedIn Connections export.
+            Google, Apple Contacts, or a LinkedIn Connections.csv — or skip and add people on the
+            map.
           </p>
           <ContactAuthPanel showSkip onSkip={() => navigate('/')} compact />
           <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-            <Link to="/">Continue to your graph →</Link>
+            <Link to="/">See my network →</Link>
           </p>
         </div>
       </div>
@@ -43,10 +44,9 @@ export function Onboarding() {
     <div className="onboarding">
       <div className="onboarding-card" id="main">
         <div className="brand-mark">Social Graph</div>
-        <h1>Map your warm intros</h1>
+        <h1>See your network</h1>
         <p className="lede">
-          One question: who do you know who can get you to someone else? Start in this browser —
-          sign in later under Settings to sync to the cloud.
+          Start with people you know. Then explore who they know. Finding intros comes after.
         </p>
 
         <form onSubmit={startGraph}>
@@ -75,9 +75,7 @@ export function Onboarding() {
               />
               <span>
                 <strong>Sample network</strong>
-                <span className="choice-desc">
-                  Explore with a public NYC real-estate demo graph. Mark who you actually know.
-                </span>
+                <span className="choice-desc">Explore a demo map, then mark who you know.</span>
               </span>
             </label>
             <label className="choice-card">
@@ -88,16 +86,14 @@ export function Onboarding() {
                 onChange={() => setLoadSample(false)}
               />
               <span>
-                <strong>Blank graph</strong>
-                <span className="choice-desc">
-                  Just you. Add people and connections as you build your map.
-                </span>
+                <strong>Blank map</strong>
+                <span className="choice-desc">Just you — add people as you go.</span>
               </span>
             </label>
           </fieldset>
 
           <button type="submit" className="btn-primary" disabled={!name.trim()}>
-            Continue
+            Open my network
           </button>
         </form>
       </div>

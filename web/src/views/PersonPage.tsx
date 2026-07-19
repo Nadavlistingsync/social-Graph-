@@ -257,17 +257,17 @@ export function PersonPage() {
         </article>
 
         <aside className="note-aside">
-          <button type="button" className="chip" onClick={() => navigate(`/graph?focus=${node.id}`)}>
-            Show in graph
+          <button type="button" className="chip" onClick={() => navigate(`/?focus=${node.id}`)}>
+            See on map
           </button>
           {node.type === 'person' && node.id !== YOU_ID && (
             <button
               type="button"
               className="chip on"
               style={{ marginTop: '0.5rem' }}
-              onClick={() => navigate(`/?to=${node.id}`)}
+              onClick={() => navigate(`/find?to=${node.id}`)}
             >
-              Find path here
+              Find intro
             </button>
           )}
         </aside>

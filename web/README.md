@@ -7,6 +7,6 @@ npm run build
 npm run preview
 ```
 
-Home = Find path. Graph at `/graph`. Person notes at `/person/:id`.
+Home = Network map. Find intro at `/find`. Person notes at `/person/:id`.
 
 For Vercel, either set Root Directory to `web`, or use the repo-root `vercel.json`.
