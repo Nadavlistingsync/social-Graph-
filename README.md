@@ -18,8 +18,10 @@ Copy [`.env.example`](./.env.example) → `.env` and fill in:
 SUPABASE_URL=https://YOUR_REF.supabase.co
 SUPABASE_ANON_KEY=…
 SUPABASE_SERVICE_ROLE_KEY=…
-OPENROUTER_API_KEY=…          # AI relationship scoring
-# OPENROUTER_MODEL=google/gemini-2.5-flash-lite
+OPENROUTER_API_KEY=…
+# Free by default — no paid credits required
+# OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free
+# OPENROUTER_MODEL_FALLBACKS=openrouter/free,nvidia/nemotron-nano-9b-v2:free
 ```
 
 Same vars on Vercel (Production). Auth + sync + AI go through `/api/auth`, `/api/graph`, and `/api/ai`.

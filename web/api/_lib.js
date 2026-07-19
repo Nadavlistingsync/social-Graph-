@@ -43,8 +43,20 @@ export function openRouterKey() {
   return env('OPENROUTER_API_KEY')
 }
 
+/** Prefer free OpenRouter models so scoring works with a $0 key. */
 export function openRouterModel() {
-  return env('OPENROUTER_MODEL') || 'google/gemini-2.5-flash-lite'
+  return env('OPENROUTER_MODEL') || 'google/gemma-4-26b-a4b-it:free'
+}
+
+/** Fallback chain when the primary free model is rate-limited. */
+export function openRouterModelFallbacks() {
+  const primary = openRouterModel()
+  const extras = (env('OPENROUTER_MODEL_FALLBACKS') ||
+    'openrouter/free,nvidia/nemotron-nano-9b-v2:free,meta-llama/llama-3.2-3b-instruct:free')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return [primary, ...extras.filter((m) => m !== primary)]
 }
 
 export function isOpenRouterConfigured() {
