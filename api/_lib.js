@@ -9,15 +9,30 @@ export function env(name, ...fallbacks) {
 }
 
 export function supabaseUrl() {
-  return env('SUPABASE_URL').replace(/\/$/, '')
+  // Accept names from our .env and from the Vercel ↔ Supabase integration
+  return env(
+    'SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'VITE_SUPABASE_URL',
+  ).replace(/\/$/, '')
 }
 
 export function anonKey() {
-  return env('SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEY')
+  return env(
+    'SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'VITE_SUPABASE_ANON_KEY',
+  )
 }
 
 export function serviceKey() {
-  return env('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY')
+  return env(
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_SECRET_KEY',
+    'SUPABASE_SERVICE_KEY',
+  )
 }
 
 export function isSupabaseEnvConfigured() {
