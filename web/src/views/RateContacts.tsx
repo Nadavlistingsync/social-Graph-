@@ -63,7 +63,7 @@ export function RateContacts({
     setStatusNote(
       ai.configured
         ? `AI scoring with ${ai.model || 'OpenRouter'}…`
-        : 'AI not configured — using smart local estimates…',
+        : 'Using smart local estimates…',
     )
 
     const ratings = await rateAllContacts({

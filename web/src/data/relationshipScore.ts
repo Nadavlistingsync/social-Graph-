@@ -141,11 +141,15 @@ export type RateContactInput = {
   summary?: string
 }
 
-export async function fetchAiStatus(): Promise<{ configured: boolean; model: string | null }> {
+export async function fetchAiStatus(): Promise<{
+  configured: boolean
+  model: string | null
+  hint?: string
+}> {
   try {
     const res = await fetch('/api/ai?action=status')
     if (!res.ok) return { configured: false, model: null }
-    return (await res.json()) as { configured: boolean; model: string | null }
+    return (await res.json()) as { configured: boolean; model: string | null; hint?: string }
   } catch {
     return { configured: false, model: null }
   }

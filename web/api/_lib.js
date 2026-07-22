@@ -43,6 +43,17 @@ export function openRouterKey() {
   return env('OPENROUTER_API_KEY')
 }
 
+/** Reject placeholders like the literal env name or blank-looking values. */
+export function isOpenRouterKeyValid(key = openRouterKey()) {
+  if (!key) return false
+  // Real OpenRouter keys look like sk-or-v1-… (typically 60+ chars).
+  if (key === 'OPENROUTER_API_KEY') return false
+  if (/^(your|changeme|todo|xxx|placeholder)/i.test(key)) return false
+  if (!/^sk-or-/i.test(key)) return false
+  if (key.length < 20) return false
+  return true
+}
+
 /** Prefer free OpenRouter models so scoring works with a $0 key. */
 export function openRouterModel() {
   return env('OPENROUTER_MODEL') || 'google/gemma-4-26b-a4b-it:free'
@@ -60,7 +71,7 @@ export function openRouterModelFallbacks() {
 }
 
 export function isOpenRouterConfigured() {
-  return Boolean(openRouterKey())
+  return isOpenRouterKeyValid()
 }
 
 export function send(res, status, body) {

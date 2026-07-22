@@ -1,5 +1,6 @@
 import {
   isOpenRouterConfigured,
+  isOpenRouterKeyValid,
   openRouterKey,
   openRouterModel,
   openRouterModelFallbacks,
@@ -8,6 +9,8 @@ import {
 } from './_lib.js'
 
 const MAX_BATCH = 40
+const KEY_HELP =
+  'Set Vercel env OPENROUTER_API_KEY to a real key from https://openrouter.ai/keys (Value must be sk-or-v1-…, not the name OPENROUTER_API_KEY), then Redeploy.'
 
 function clampScore(n) {
   const x = Number(n)
@@ -44,10 +47,18 @@ function extractJson(text) {
 }
 
 async function callOpenRouter(model, messages) {
+  const key = openRouterKey()
+  if (!isOpenRouterKeyValid(key)) {
+    return {
+      ok: false,
+      status: 503,
+      data: { error: { message: KEY_HELP } },
+    }
+  }
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${openRouterKey()}`,
+      Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://social-graph-one.vercel.app',
       'X-Title': 'Social Graph',
@@ -96,7 +107,20 @@ Every contact id must appear exactly once. reason max 12 words.`
   for (const model of models) {
     const { ok, status, data } = await callOpenRouter(model, messages)
     if (!ok) {
-      lastError = data?.error?.message || data?.message || `OpenRouter error (${status})`
+      const msg = data?.error?.message || data?.message || `OpenRouter error (${status})`
+      // Bad/placeholder key — don't burn the fallback chain.
+      if (
+        status === 401 ||
+        status === 403 ||
+        /missing authentication|user not found|invalid.*key|unauthorized/i.test(msg)
+      ) {
+        const err = new Error(
+          /missing authentication/i.test(msg) ? KEY_HELP : `${msg}. ${KEY_HELP}`,
+        )
+        err.status = 503
+        throw err
+      }
+      lastError = msg
       continue
     }
 
@@ -153,20 +177,25 @@ export default async function handler(req, res) {
 
   if (action === 'status' && req.method === 'GET') {
     const key = openRouterKey()
+    const valid = isOpenRouterKeyValid(key)
     return send(res, 200, {
-      configured: Boolean(key),
+      configured: valid,
+      keyPresent: Boolean(key),
       keyLength: key ? key.length : 0,
-      model: key ? openRouterModel() : null,
+      keyLooksValid: valid,
+      model: valid ? openRouterModel() : null,
       free: true,
-      fallbacks: key ? openRouterModelFallbacks() : [],
+      fallbacks: valid ? openRouterModelFallbacks() : [],
+      hint: key && !valid ? KEY_HELP : undefined,
     })
   }
 
   if (action === 'rate' && req.method === 'POST') {
     if (!isOpenRouterConfigured()) {
       return send(res, 503, {
-        error:
-          'OPENROUTER_API_KEY is missing on the server. In Vercel: Key=OPENROUTER_API_KEY, Value=sk-or-v1-…, then Redeploy.',
+        error: openRouterKey()
+          ? KEY_HELP
+          : 'OPENROUTER_API_KEY is missing on the server. In Vercel: Key=OPENROUTER_API_KEY, Value=sk-or-v1-…, then Redeploy.',
       })
     }
     try {
