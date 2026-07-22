@@ -12,6 +12,8 @@ import {
   addEdge as storeAddEdge,
   addPerson as storeAddPerson,
   completeOnboarding,
+  ensureTargetPerson,
+  getCustomPersonIds,
   getEdges,
   getNodes,
   getProfile,
@@ -20,6 +22,7 @@ import {
   isOnboarded,
   migrateLegacyUser,
   resetWorkspace,
+  resolveTargetId,
   setLoadSample,
   slugify,
   updateProfile,
@@ -38,12 +41,15 @@ type GraphContextValue = {
   finishOnboarding: (name: string, loadSample: boolean, targetPerson?: string) => void
   updateProfile: (patch: Partial<WorkspaceProfile>) => void
   setLoadSample: (loadSample: boolean) => void
+  ensureTarget: (name: string) => string | null
+  resolveTarget: (nameOrId?: string | null) => string | null
+  customPersonIds: Set<string>
   addPerson: (
     input: {
       name: string
       summary?: string
       type?: GraphNode['type']
-      connectToId?: string
+      connectToId?: string | null
       edgeType?: GraphEdge['type']
       knownByUser?: boolean
     },
@@ -102,6 +108,17 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         setLoadSample(loadSample)
         bump()
       },
+      ensureTarget: (name) => {
+        const result = ensureTargetPerson(name)
+        if (result?.changed) bump()
+        return result?.id ?? null
+      },
+      resolveTarget: (nameOrId) => {
+        const result = resolveTargetId(nameOrId)
+        if (result?.changed) bump()
+        return result?.id ?? null
+      },
+      customPersonIds: getCustomPersonIds(),
       addPerson: (input) => {
         const ids = new Set(getNodes().map((n) => n.id))
         const id = slugify(input.name, ids)
@@ -113,7 +130,8 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           tags: [],
           timeline: [{ date: new Date().toISOString().slice(0, 7), label: 'Added to your graph' }],
         }
-        const connectToId = input.connectToId ?? getYouId()
+        const connectToId =
+          input.connectToId === null ? null : (input.connectToId ?? getYouId())
         let edge: GraphEdge | undefined
         if (connectToId && connectToId !== id) {
           edge = {

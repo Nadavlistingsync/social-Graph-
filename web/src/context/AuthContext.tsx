@@ -18,6 +18,7 @@ import {
   type AuthSession,
   type AuthUser,
 } from '../lib/authSession'
+import { consumeAuthRedirect } from '../lib/authRedirect'
 
 type AuthContextValue = {
   configured: boolean
@@ -107,7 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isConfigured = status.ok && status.data.configured
       setConfigured(isConfigured)
 
-      let current = loadSession()
+      // Magic link / email confirm redirects land with tokens in the hash.
+      const fromRedirect = consumeAuthRedirect()
+      if (fromRedirect) {
+        saveSession(fromRedirect)
+      }
+
+      let current = fromRedirect ?? loadSession()
       if (current && isConfigured) {
         current = (await refreshIfNeeded(current)) ?? null
       }
@@ -205,9 +212,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    await apiJson('/api/auth?action=signout', { method: 'POST' })
+    const token = userIdRef.current ? loadSession()?.access_token : null
+    // Best-effort push before clearing the session so cloud stays current.
+    if (userIdRef.current && configured) {
+      try {
+        await pushLocalToRemote(userIdRef.current)
+      } catch {
+        /* keep signing out even if sync fails */
+      }
+    }
+    await apiJson('/api/auth?action=signout', {
+      method: 'POST',
+      ...(token ? { token } : {}),
+    })
     applySession(null, false)
-  }, [applySession])
+  }, [applySession, configured])
 
   const syncNow = useCallback(async () => {
     const userId = userIdRef.current

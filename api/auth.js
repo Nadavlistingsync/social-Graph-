@@ -174,6 +174,15 @@ export default async function handler(req, res) {
     }
 
     if (action === 'signout' && req.method === 'POST') {
+      const token = (req.headers.authorization || '').startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : ''
+      if (token && anonKey()) {
+        await supabaseAuth('/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      }
       return send(res, 200, { ok: true })
     }
 

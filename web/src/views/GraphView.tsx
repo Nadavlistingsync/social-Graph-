@@ -87,7 +87,7 @@ function fitToNodes(
 
 export function GraphView() {
   const navigate = useNavigate()
-  const { nodes, edges, version, youId } = useGraph()
+  const { nodes, edges, version, youId, profile } = useGraph()
   const { version: prefVersion, getWarmth } = usePreferences()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
@@ -100,6 +100,11 @@ export function GraphView() {
   const zoomRef = useRef<ReturnType<typeof zoom<SVGSVGElement, unknown>> | null>(null)
 
   useDocumentTitle('Network')
+
+  const onlyYou = useMemo(() => {
+    void version
+    return nodes.filter((n) => n.type === 'person').length <= 1
+  }, [nodes, version])
 
   useEffect(() => {
     setSelectedId(focusId)
@@ -326,6 +331,24 @@ export function GraphView() {
           <svg ref={svgRef} role="img" aria-label="Your network map">
             <g ref={gRef} />
           </svg>
+          {onlyYou && (
+            <div className="graph-empty-cta">
+              <strong>Your map is empty</strong>
+              <p>
+                {profile.targetPerson
+                  ? `Import people who might know ${profile.targetPerson.split(' ')[0]}.`
+                  : 'Import contacts or add someone you know.'}
+              </p>
+              <div className="panel-actions">
+                <button type="button" className="btn-primary" onClick={() => navigate('/rate')}>
+                  Import & rate
+                </button>
+                <button type="button" className="btn-quiet" onClick={() => navigate('/find')}>
+                  Find intro
+                </button>
+              </div>
+            </div>
+          )}
           <div className="graph-hint">
             {layer === 'mine'
               ? 'People you know · pinch to zoom · tap someone'
