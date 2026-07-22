@@ -1352,6 +1352,34 @@ button {
   margin: 0;
 }
 
+.section-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.enrich-toast {
+  position: absolute;
+  top: 3.25rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--accent-dim);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+}
+
+.enrich-note {
+  margin: 0 0 0.75rem;
+  color: var(--accent);
+}
+
 .topbar {
   display: flex;
   align-items: center;
