@@ -23,11 +23,14 @@ export function applyScoreToOverride(
   meta: { reason: string; source: RelationshipScore['source']; confirmed?: boolean },
 ): WarmthOverride {
   const base = scoreToWarmth(score)
+  const confirmed = meta.confirmed ?? meta.source === 'user'
   return {
     ...base,
+    // Unconfirmed AI/heuristic guesses shouldn't flood "my network".
+    knownByUser: confirmed ? base.knownByUser : score >= 7,
     reason: meta.reason.slice(0, 160),
     source: meta.source,
-    confirmed: meta.confirmed ?? meta.source === 'user',
+    confirmed,
     ratedAt: new Date().toISOString(),
   }
 }
@@ -141,6 +144,16 @@ export type RateContactInput = {
   summary?: string
 }
 
+import { loadSession } from '../lib/authSession'
+
+function authHeaders(): HeadersInit {
+  const token = loadSession()?.access_token
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
 export async function fetchAiStatus(): Promise<{ configured: boolean; model: string | null }> {
   try {
     const res = await fetch('/api/ai?action=status')
@@ -162,7 +175,7 @@ export async function rateContactsBatch(args: {
   try {
     const res = await fetch('/api/ai?action=rate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({
         userName: args.userName,
         userEmail: args.userEmail,

@@ -1,5 +1,7 @@
 -- Social Graph: per-user workspace blob (matches browser export format)
--- Apply in Supabase SQL Editor, or: SUPABASE_SECRET_KEY=… node scripts/apply-schema.mjs
+-- Apply in Supabase SQL Editor, or: SUPABASE_SECRET_KEY=… node web/scripts/apply-schema.mjs
+--
+-- /api/graph reads and writes this table (Postgres). No Storage bucket required.
 
 create table if not exists public.user_graphs (
   user_id uuid primary key references auth.users (id) on delete cascade,

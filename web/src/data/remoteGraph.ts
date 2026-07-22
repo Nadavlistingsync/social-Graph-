@@ -8,6 +8,17 @@ import {
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline'
 
+function blobTimestamp(blob: UserDataBlob | null | undefined): number {
+  if (!blob?.exportedAt) return 0
+  const t = Date.parse(blob.exportedAt)
+  return Number.isFinite(t) ? t : 0
+}
+
+function remoteHasContent(remote: UserDataBlob | null): boolean {
+  if (!remote?.workspace) return false
+  return localDataHasContent(remote)
+}
+
 async function accessToken(): Promise<string | null> {
   return loadSession()?.access_token ?? null
 }
@@ -36,9 +47,10 @@ export async function fetchRemoteGraph(): Promise<UserDataBlob | null> {
 }
 
 export async function upsertRemoteGraph(blob: UserDataBlob): Promise<void> {
+  const exportedAt = blob.exportedAt || new Date().toISOString()
   const res = await apiGraph('PUT', {
     version: 2,
-    exportedAt: new Date().toISOString(),
+    exportedAt,
     workspace: blob.workspace,
     warmth: blob.warmth,
     awkwardEdges: blob.awkwardEdges,
@@ -50,29 +62,63 @@ export async function upsertRemoteGraph(blob: UserDataBlob): Promise<void> {
   }
 }
 
+/**
+ * Last-write-wins reconcile. Never clobber newer local edits with an older remote.
+ */
 export async function reconcileOnSignIn(_userId: string): Promise<'pulled' | 'pushed' | 'empty'> {
   const remote = await fetchRemoteGraph()
-  if (remote?.workspace?.profile) {
+  const local = readUserDataBlob()
+  const localHas = localDataHasContent(local)
+  const remoteOk = remoteHasContent(remote)
+
+  if (!remoteOk && !localHas) return 'empty'
+
+  if (!remoteOk && localHas) {
+    await upsertRemoteGraph(local)
+    return 'pushed'
+  }
+
+  if (remoteOk && !localHas) {
     writeUserDataBlob(
       {
         version: 2,
-        workspace: remote.workspace,
-        warmth: remote.warmth ?? {},
-        awkwardEdges: remote.awkwardEdges ?? [],
-        notes: remote.notes ?? {},
+        exportedAt: remote!.exportedAt,
+        workspace: remote!.workspace,
+        warmth: remote!.warmth ?? {},
+        awkwardEdges: remote!.awkwardEdges ?? [],
+        notes: remote!.notes ?? {},
       },
       { silent: true },
     )
     return 'pulled'
   }
-  const local = readUserDataBlob()
-  if (localDataHasContent(local)) {
+
+  const remoteTs = blobTimestamp(remote)
+  const localTs = blobTimestamp(local)
+
+  // Prefer local when equal or newer — avoids wiping in-progress edits on re-login.
+  if (localTs >= remoteTs) {
     await upsertRemoteGraph(local)
     return 'pushed'
   }
-  return 'empty'
+
+  writeUserDataBlob(
+    {
+      version: 2,
+      exportedAt: remote!.exportedAt,
+      workspace: remote!.workspace,
+      warmth: remote!.warmth ?? {},
+      awkwardEdges: remote!.awkwardEdges ?? [],
+      notes: remote!.notes ?? {},
+    },
+    { silent: true },
+  )
+  return 'pulled'
 }
 
 export async function pushLocalToRemote(_userId: string): Promise<void> {
   await upsertRemoteGraph(readUserDataBlob())
 }
+
+/** Exported for unit tests */
+export const __test = { blobTimestamp, remoteHasContent }

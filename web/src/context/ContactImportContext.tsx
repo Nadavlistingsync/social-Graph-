@@ -65,14 +65,18 @@ export function ContactImportProvider({ children }: { children: ReactNode }) {
 
     registerLaunchQueueConsumer(async (files) => {
       const result = await importFiles(files)
-      if (result && result.imported > 0) setModalOpen(true)
-      setPending({ files })
+      if (result && result.imported > 0) {
+        setModalOpen(true)
+      }
     })
   }, [isOnboarded, importFiles])
 
   useEffect(() => {
     if (!pending || !isOnboarded) return
-    void importFiles(pending.files).then(() => setPending(null))
+    void importFiles(pending.files).then(() => {
+      setPending(null)
+      setModalOpen(true)
+    })
   }, [pending, isOnboarded, importFiles])
 
   return (

@@ -9,7 +9,7 @@ import {
   loadWarmthOverrides,
   type WarmthOverride,
 } from './preferences'
-import { notifyUserDataChanged } from './syncBus'
+import { notifyUserDataChanged, touchUpdatedAt, readUpdatedAt } from './syncBus'
 
 export type UserDataBlob = {
   version: 2
@@ -31,6 +31,7 @@ function writeJson(key: string, value: unknown): void {
 export function readUserDataBlob(): UserDataBlob {
   return {
     version: 2,
+    exportedAt: readUpdatedAt() || undefined,
     workspace: loadWorkspaceState(),
     warmth: loadWarmthOverrides(),
     awkwardEdges: [...loadAwkwardEdges()],
@@ -60,6 +61,16 @@ export function writeUserDataBlob(data: UserDataBlob, options?: { silent?: boole
         /* ignore */
       }
     }
+  }
+
+  if (data.exportedAt) {
+    try {
+      localStorage.setItem('sg-updated-at-v1', data.exportedAt)
+    } catch {
+      /* ignore */
+    }
+  } else {
+    touchUpdatedAt()
   }
 
   if (!options?.silent) notifyUserDataChanged()

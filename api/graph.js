@@ -1,6 +1,6 @@
 /**
- * Sync API — verifies the user's JWT, then reads/writes their graph in Storage.
- * Secrets come only from server .env (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).
+ * Sync API — verifies the user's JWT, then reads/writes their graph in Postgres
+ * (public.user_graphs). Secrets come only from server .env.
  */
 import {
   bearer,
@@ -11,22 +11,39 @@ import {
   verifyUser,
 } from './_lib.js'
 
-const BUCKET = 'user-graphs'
-const OBJECT = 'graph.json'
-
-async function storageFetch(userId, method, body) {
-  const url = supabaseUrl()
+function restHeaders(extra = {}) {
   const key = serviceKey()
-  const path = `${url}/storage/v1/object/${BUCKET}/${userId}/${OBJECT}`
-  const headers = {
+  return {
     apikey: key,
     Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+    ...extra,
   }
-  if (method === 'POST' || method === 'PUT') {
-    headers['Content-Type'] = 'application/json'
-    headers['x-upsert'] = 'true'
+}
+
+async function fetchGraphRow(userId) {
+  const url = supabaseUrl()
+  const res = await fetch(
+    `${url}/rest/v1/user_graphs?user_id=eq.${encodeURIComponent(userId)}&select=*`,
+    { method: 'GET', headers: restHeaders({ Accept: 'application/json' }) },
+  )
+  if (!res.ok) {
+    const text = await res.text()
+    return { ok: false, status: res.status, text }
   }
-  return fetch(path, { method, headers, body })
+  const rows = await res.json()
+  return { ok: true, row: Array.isArray(rows) && rows[0] ? rows[0] : null }
+}
+
+function rowToBlob(row) {
+  return {
+    version: 2,
+    exportedAt: row.updated_at || undefined,
+    workspace: row.workspace ?? {},
+    warmth: row.warmth ?? {},
+    awkwardEdges: row.awkward_edges ?? [],
+    notes: row.notes ?? {},
+  }
 }
 
 export default async function handler(req, res) {
@@ -50,14 +67,15 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const remote = await storageFetch(user.id, 'GET')
-      if (remote.status === 404) return send(res, 404, { error: 'Not found' })
-      if (!remote.ok) {
-        const text = await remote.text()
-        return send(res, 502, { error: 'Storage read failed', detail: text.slice(0, 300) })
+      const result = await fetchGraphRow(user.id)
+      if (!result.ok) {
+        return send(res, 502, {
+          error: 'Database read failed',
+          detail: String(result.text || '').slice(0, 300),
+        })
       }
-      const data = await remote.json()
-      return send(res, 200, data)
+      if (!result.row) return send(res, 404, { error: 'Not found' })
+      return send(res, 200, rowToBlob(result.row))
     }
 
     if (req.method === 'PUT') {
@@ -71,10 +89,30 @@ export default async function handler(req, res) {
       if (!parsed || typeof parsed !== 'object' || !parsed.workspace) {
         return send(res, 400, { error: 'Body must include workspace' })
       }
-      const remote = await storageFetch(user.id, 'PUT', JSON.stringify(parsed))
+
+      const payload = {
+        user_id: user.id,
+        workspace: parsed.workspace,
+        warmth: parsed.warmth ?? {},
+        awkward_edges: parsed.awkwardEdges ?? [],
+        notes: parsed.notes ?? {},
+        updated_at: parsed.exportedAt || new Date().toISOString(),
+      }
+
+      const url = supabaseUrl()
+      const remote = await fetch(`${url}/rest/v1/user_graphs`, {
+        method: 'POST',
+        headers: restHeaders({
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        }),
+        body: JSON.stringify(payload),
+      })
       if (!remote.ok) {
         const text = await remote.text()
-        return send(res, 502, { error: 'Storage write failed', detail: text.slice(0, 300) })
+        return send(res, 502, {
+          error: 'Database write failed',
+          detail: text.slice(0, 300),
+        })
       }
       return send(res, 200, { ok: true })
     }

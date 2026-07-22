@@ -6,7 +6,7 @@ export function NotFound() {
   useDocumentTitle('Page not found')
 
   return (
-    <Shell active="paths">
+    <Shell active="graph">
       <div className="empty-state" style={{ paddingTop: '12vh' }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', margin: '0 0 0.5rem' }}>
           Page not found
@@ -15,7 +15,7 @@ export function NotFound() {
           That route doesn&apos;t exist in this graph.
         </p>
         <Link to="/" className="btn-primary" style={{ display: 'inline-block', width: 'auto' }}>
-          Back to path finder
+          Back to network
         </Link>
       </div>
     </Shell>

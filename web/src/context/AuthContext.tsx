@@ -13,6 +13,7 @@ import { onUserDataChanged } from '../data/syncBus'
 import {
   apiJson,
   clearSession,
+  consumeAuthRedirect,
   loadSession,
   saveSession,
   type AuthSession,
@@ -107,9 +108,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isConfigured = status.ok && status.data.configured
       setConfigured(isConfigured)
 
+      // Magic link / email confirm: tokens arrive in the URL hash.
+      const redirect = consumeAuthRedirect()
+      if (redirect && isConfigured) {
+        const userResult = await apiJson<{ user: AuthUser }>('/api/auth?action=user', {
+          method: 'GET',
+          token: redirect.access_token,
+        })
+        if (!cancelled && userResult.ok && userResult.data.user?.id) {
+          const next: AuthSession = {
+            access_token: redirect.access_token,
+            refresh_token: redirect.refresh_token,
+            expires_at: redirect.expires_at,
+            user: { id: userResult.data.user.id, email: userResult.data.user.email },
+          }
+          applySession(next, true)
+          setReady(true)
+          return
+        }
+      }
+
       let current = loadSession()
       if (current && isConfigured) {
         current = (await refreshIfNeeded(current)) ?? null
+        if (!current && !cancelled) {
+          setSession(null)
+          setSyncError('Session expired — please sign in again.')
+        }
       }
       if (cancelled) return
       if (current) {
@@ -136,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refreshIfNeeded])
+  }, [refreshIfNeeded, applySession])
 
   const schedulePush = useCallback(() => {
     const userId = userIdRef.current
@@ -205,7 +230,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    await apiJson('/api/auth?action=signout', { method: 'POST' })
+    const current = loadSession()
+    await apiJson('/api/auth?action=signout', {
+      method: 'POST',
+      token: current?.access_token,
+    })
     applySession(null, false)
   }, [applySession])
 

@@ -1,10 +1,13 @@
 import {
+  bearer,
   isOpenRouterConfigured,
+  isSupabaseEnvConfigured,
   openRouterKey,
   openRouterModel,
   openRouterModelFallbacks,
   readJson,
   send,
+  verifyUser,
 } from './_lib.js'
 
 const MAX_BATCH = 40
@@ -168,6 +171,14 @@ export default async function handler(req, res) {
         error:
           'OPENROUTER_API_KEY is missing on the server. In Vercel: Key=OPENROUTER_API_KEY, Value=sk-or-v1-…, then Redeploy.',
       })
+    }
+    // When Supabase auth is configured, require a signed-in user so the key isn't public.
+    if (isSupabaseEnvConfigured()) {
+      const token = bearer(req)
+      const user = token ? await verifyUser(token) : null
+      if (!user?.id) {
+        return send(res, 401, { error: 'Sign in required for AI rating' })
+      }
     }
     try {
       const body = await readJson(req)

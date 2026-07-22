@@ -1,10 +1,12 @@
 import {
   anonKey,
+  bearer,
   isSupabaseEnvConfigured,
   readJson,
   send,
   serviceKey,
   supabaseUrl,
+  verifyUser,
 } from './_lib.js'
 
 async function supabaseAuth(path, init = {}, useServiceRole = false) {
@@ -173,7 +175,24 @@ export default async function handler(req, res) {
       return send(res, 200, sessionPayload(data))
     }
 
+    if (action === 'user' && req.method === 'GET') {
+      const token = bearer(req)
+      if (!token) return send(res, 401, { error: 'Missing Authorization bearer token' })
+      const user = await verifyUser(token)
+      if (!user?.id) return send(res, 401, { error: 'Invalid session' })
+      return send(res, 200, {
+        user: { id: user.id, email: user.email ?? null },
+      })
+    }
+
     if (action === 'signout' && req.method === 'POST') {
+      const token = bearer(req)
+      if (token) {
+        await supabaseAuth('/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      }
       return send(res, 200, { ok: true })
     }
 

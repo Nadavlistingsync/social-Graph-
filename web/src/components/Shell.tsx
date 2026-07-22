@@ -10,6 +10,7 @@ import { AddPersonModal } from './GraphModals'
 const tabs = [
   { to: '/', label: 'Network', id: 'graph' as const },
   { to: '/find', label: 'Find', id: 'paths' as const },
+  { to: '/rate', label: 'Rate', id: 'rate' as const },
   { to: '/settings', label: 'Settings', id: 'settings' as const },
 ]
 
@@ -18,7 +19,7 @@ export function Shell({
   active,
 }: {
   children: React.ReactNode
-  active: 'graph' | 'person' | 'paths' | 'settings'
+  active: 'graph' | 'person' | 'paths' | 'settings' | 'rate'
 }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
@@ -27,7 +28,7 @@ export function Shell({
   const { openImport } = useContactImport()
   const navigate = useNavigate()
   const { profile, version } = useGraph()
-  const { user, syncStatus } = useAuth()
+  const { user, syncStatus, syncError } = useAuth()
   const results = useMemo(() => {
     void version
     return open && q.trim() ? searchNodes(q).slice(0, 6) : []
@@ -39,6 +40,14 @@ export function Shell({
     setOpen(false)
     setHighlight(0)
   }
+
+  const syncLabel = syncError
+    ? 'Sync error'
+    : syncStatus === 'synced'
+      ? 'Synced'
+      : syncStatus === 'syncing'
+        ? 'Syncing…'
+        : user?.email?.split('@')[0] || 'Account'
 
   return (
     <div className="app-shell">
@@ -116,14 +125,15 @@ export function Shell({
               </div>
             )}
           </div>
-          <button type="button" className="btn-quiet desktop-only" onClick={openImport}>
+          <button type="button" className="btn-quiet" onClick={openImport}>
             Contacts
           </button>
-          <Link to="/rate" className="btn-quiet desktop-only">
-            Rate
-          </Link>
-          <Link to="/settings" className="btn-quiet desktop-only account-chip">
-            {user ? (syncStatus === 'synced' ? 'Synced' : user.email?.split('@')[0] || 'Account') : 'Account'}
+          <Link
+            to="/settings"
+            className={`btn-quiet account-chip ${syncError ? 'sync-error' : ''}`}
+            title={syncError || undefined}
+          >
+            {user ? syncLabel : 'Account'}
           </Link>
           <button type="button" className="btn-primary chrome-add" onClick={() => setAddOpen(true)}>
             Add
