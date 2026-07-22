@@ -4,7 +4,6 @@ import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useAuth } from '../context/AuthContext'
 import { useGraph } from '../context/GraphContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { startInvestorDemo } from '../data/demoMode'
 import { PitchScreen } from './PitchScreen'
 import { RateContacts } from './RateContacts'
 
@@ -75,7 +74,7 @@ export function Onboarding() {
   const [params] = useSearchParams()
   const location = useLocation()
   const { user, ready, configured, signInWithPassword, signUpWithPassword } = useAuth()
-  const { finishOnboarding, profile } = useGraph()
+  const { finishOnboarding, profile, startInvestorDemo: launchDemo } = useGraph()
 
   const [step, setStepState] = useState<Step>(() => gateStep())
   const [authMode, setAuthMode] = useState<AuthMode>('signup')
@@ -112,13 +111,13 @@ export function Onboarding() {
   useEffect(() => {
     if (!ready) return
     if (params.get('demo') === '1' || location.pathname === '/demo') {
-      startInvestorDemo()
+      launchDemo()
       navigate('/', { replace: true })
     }
-  }, [ready, params, location.pathname, navigate])
+  }, [ready, params, location.pathname, navigate, launchDemo])
 
   function handleStartDemo() {
-    startInvestorDemo()
+    launchDemo()
     navigate('/', { replace: true })
   }
 

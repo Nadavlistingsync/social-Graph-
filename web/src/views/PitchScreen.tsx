@@ -32,14 +32,15 @@ export function PitchScreen({ onStartDemo, onSignIn, onContinue }: PitchScreenPr
         </ul>
 
         <div className="pitch-example">
-          <span className="pitch-example-label">Example path</span>
-          <span className="pitch-path-chain">You → Jay Neveloff → NYC counsel → … → Donald Trump</span>
-          <span className="pitch-example-note">Illustrative demo data — try the live walkthrough</span>
+          <span className="pitch-example-label">Example at scale</span>
+          <span className="pitch-path-chain">You → 50,000 people → Donald Trump (or anyone)</span>
+          <span className="pitch-example-note">Synthetic 50k-person demo · search any name · path in seconds</span>
         </div>
 
         <button type="button" className="btn-primary pitch-cta" onClick={onStartDemo}>
           Start live demo
         </button>
+        <p className="pitch-autoplay-hint">60-second walkthrough · or tap Auto-play inside</p>
         <p className="pitch-secondary">
           <button type="button" className="text-btn" onClick={onContinue}>
             Continue with my contacts

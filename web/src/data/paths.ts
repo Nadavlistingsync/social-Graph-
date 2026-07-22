@@ -1,5 +1,12 @@
 import { loadAwkwardEdges, loadWarmthOverrides } from './preferences'
-import { getEdges, getNodes, getYouId } from './graphStore'
+import { getEdges, getNodes, getYouId, isMegaSample } from './graphStore'
+import {
+  getMegaKnownIds,
+  getMegaNeighbors,
+  getMegaNode,
+  getMegaShortestPath,
+  searchMegaNodes,
+} from './megaGraph'
 import type { EvidenceQuality, GraphEdge, GraphNode, PathHop, RankedPath } from './types'
 
 const qualityScore: Record<EvidenceQuality, number> = {
@@ -10,6 +17,13 @@ const qualityScore: Record<EvidenceQuality, number> = {
 }
 
 export function getNode(id: string): GraphNode | undefined {
+  if (isMegaSample()) {
+    const mega = getMegaNode(id)
+    if (!mega) return undefined
+    const override = loadWarmthOverrides()[id]
+    if (!override) return mega
+    return { ...mega, knownByUser: override.knownByUser, warmth: override.warmth }
+  }
   const base = getNodes().find((n) => n.id === id)
   if (!base) return undefined
   const override = loadWarmthOverrides()[id]
@@ -18,6 +32,9 @@ export function getNode(id: string): GraphNode | undefined {
 }
 
 export function getEdgesForNode(id: string): GraphEdge[] {
+  if (isMegaSample()) {
+    return getMegaNeighbors(id, 0.15).map((n) => n.edge)
+  }
   return getEdges().filter((e) => e.source === id || e.target === id)
 }
 
@@ -47,20 +64,30 @@ function implicitKnownEdges(
 ): { nodeId: string; edge: GraphEdge }[] {
   const youId = getYouId()
   const results: { nodeId: string; edge: GraphEdge }[] = []
-  for (const node of getNodes()) {
-    if (node.id === youId) continue
-    const effective = getNode(node.id)
+
+  const knownIds = isMegaSample()
+    ? getMegaKnownIds()
+    : getNodes()
+        .filter((n) => {
+          if (n.id === youId) return false
+          const effective = getNode(n.id)
+          return effective?.knownByUser
+        })
+        .map((n) => n.id)
+
+  for (const nodeId of knownIds) {
+    const effective = getNode(nodeId)
     if (!effective?.knownByUser) continue
     const strength = effective.warmth ?? 0.7
     if (strength < minStrength) continue
-    const edgeId = `implicit-you-${node.id}`
+    const edgeId = `implicit-you-${nodeId}`
     if (awkwardEdges.has(edgeId)) continue
     results.push({
-      nodeId: node.id,
+      nodeId,
       edge: {
         id: edgeId,
         source: youId,
-        target: node.id,
+        target: nodeId,
         type: 'partner',
         strength,
         recency: new Date().toISOString().slice(0, 10),
@@ -86,15 +113,19 @@ function neighbors(
   minStrength: number,
   awkwardEdges: Set<string>,
 ): { nodeId: string; edge: GraphEdge }[] {
-  const explicit = getEdges()
-    .filter(
-      (e) =>
-        (e.source === id || e.target === id) &&
-        allowedTypes.has(e.type) &&
-        e.strength >= minStrength &&
-        !awkwardEdges.has(e.id),
-    )
-    .map((e) => ({ nodeId: otherEnd(e, id), edge: e }))
+  const explicit = isMegaSample()
+    ? getMegaNeighbors(id, minStrength).filter(
+        (hop) => allowedTypes.has(hop.edge.type) && !awkwardEdges.has(hop.edge.id),
+      )
+    : getEdges()
+        .filter(
+          (e) =>
+            (e.source === id || e.target === id) &&
+            allowedTypes.has(e.type) &&
+            e.strength >= minStrength &&
+            !awkwardEdges.has(e.id),
+        )
+        .map((e) => ({ nodeId: otherEnd(e, id), edge: e }))
 
   if (id !== getYouId()) return explicit
 
@@ -103,6 +134,49 @@ function neighbors(
   )
   const seen = new Set(explicit.map((h) => h.nodeId))
   return [...explicit, ...implicit.filter((h) => !seen.has(h.nodeId))]
+}
+
+function pathFromNodeIds(nodeIds: string[], minStrength: number): PathHop[] {
+  const hops: PathHop[] = []
+  for (let i = 0; i < nodeIds.length - 1; i++) {
+    const fromId = nodeIds[i]
+    const toId = nodeIds[i + 1]
+    const hop = getMegaNeighbors(fromId, minStrength).find((n) => n.nodeId === toId)
+    if (hop) hops.push({ fromId, toId, edge: hop.edge })
+  }
+  return hops
+}
+
+function findMegaPaths(
+  targetId: string,
+  opts: { maxDepth?: number; maxPaths?: number; minStrength?: number; fromId?: string },
+): RankedPath[] {
+  const fromId = opts.fromId ?? getYouId()
+  const minStrength = opts.minStrength ?? 0.15
+  const maxPaths = opts.maxPaths ?? 3
+
+  const shortest = getMegaShortestPath(fromId, targetId)
+  if (!shortest || shortest.length < 2) return []
+
+  const paths: PathHop[][] = []
+  const primary = pathFromNodeIds(shortest, minStrength)
+  if (primary.length) paths.push(primary)
+
+  // One alternate route if within depth budget.
+  if (paths.length < maxPaths && shortest.length > 2) {
+    const altStart = shortest[1]
+    const altRest = getMegaShortestPath(altStart, targetId)
+    if (altRest && altRest.length > 1) {
+      const altIds = [fromId, ...altRest]
+      const altHops = pathFromNodeIds(altIds, minStrength)
+      if (altHops.length && altHops.length !== primary.length) paths.push(altHops)
+    }
+  }
+
+  return paths
+    .map((hops, i) => rankPath(hops, i))
+    .sort((a, b) => b.scores.total - a.scores.total)
+    .slice(0, maxPaths)
 }
 
 /** BFS enumeration of simple paths You → target, capped for MVP. */
@@ -120,6 +194,13 @@ export function findPaths(
   const maxDepth = opts.maxDepth ?? 5
   const maxPaths = opts.maxPaths ?? 40
   const minStrength = opts.minStrength ?? 0.15
+
+  if (fromId === targetId) return []
+
+  if (isMegaSample()) {
+    return findMegaPaths(targetId, { ...opts, maxDepth, maxPaths, minStrength, fromId })
+  }
+
   const allEdges = getEdges()
   const allowedTypes = new Set(opts.allowedTypes ?? allEdges.map((e) => e.type))
   const awkwardEdges = loadAwkwardEdges()
@@ -218,6 +299,7 @@ export function bestFirstHop(paths: RankedPath[]): { node: GraphNode; path: Rank
 }
 
 export function searchNodes(query: string): GraphNode[] {
+  if (isMegaSample()) return searchMegaNodes(query, 20)
   const nodes = getNodes()
   const q = query.trim().toLowerCase()
   if (!q) return nodes.filter((n) => n.type === 'person')

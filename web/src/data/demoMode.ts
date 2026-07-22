@@ -1,5 +1,8 @@
 import { completeOnboarding } from './graphStore'
+import { ensureMegaGraph } from './megaGraph'
 import { saveWarmthOverride } from './preferences'
+import { bestFirstHop, findPaths } from './paths'
+import type { RankedPath } from './types'
 
 export const DEMO_TARGET_ID = 'donald-trump'
 export const DEMO_BRIDGE_ID = 'jay-neveloff'
@@ -15,14 +18,14 @@ export const DEMO_STEPS: Record<
   { title: string; body: string; cta?: string; route?: string }
 > = {
   1: {
-    title: 'Your network, on a map',
-    body: 'Social Graph is not a CRM. It answers one question: who do you know who can warm-intro you to anyone?',
+    title: '50,000 people on your map',
+    body: 'This demo loads a synthetic network of 50,000 people with 100k+ connections. You’re at the center — not a CRM, a warm-intro engine.',
     cta: 'Next',
     route: '/',
   },
   2: {
     title: 'People you actually know',
-    body: 'Jay Neveloff is marked as someone you know well — your strongest first hop in this demo.',
+    body: 'Jay Neveloff is one of 49 people you know directly — your warmest first hop in this 50k demo.',
     cta: 'Next',
     route: '/?focus=jay-neveloff',
   },
@@ -34,7 +37,7 @@ export const DEMO_STEPS: Record<
   },
   4: {
     title: 'Find the warm intro',
-    body: 'Pick a target and we rank who you should ask. Every link has a source — no fake access claims.',
+    body: 'We rank who you should ask. Jay Neveloff is your best first hop to Donald Trump — watch the path build.',
     cta: 'See intro path',
     route: '/find?to=donald-trump',
   },
@@ -72,8 +75,38 @@ export function setDemoStep(step: DemoStep) {
   }
 }
 
-export function startInvestorDemo(name = 'Alex Chen') {
-  completeOnboarding(name, true, 'Donald Trump')
+export function getDemoShowcasePath(): RankedPath | null {
+  const paths = findPaths(DEMO_TARGET_ID, { maxDepth: 5, maxPaths: 3, minStrength: 0.35 })
+  return bestFirstHop(paths)?.path ?? paths[0] ?? null
+}
+
+export function getDemoSpotlightIds(step: DemoStep): Set<string> {
+  const path = getDemoShowcasePath()
+  const ids = new Set<string>()
+  if (step === 1) {
+    ids.add('you')
+    if (path) ids.add(path.firstHopId)
+    return ids
+  }
+  if (step === 2) {
+    ids.add(DEMO_BRIDGE_ID)
+    ids.add('you')
+    return ids
+  }
+  if (step === 3) {
+    ids.add(DEMO_BRIDGE_ID)
+    ids.add('you')
+    ids.add(DEMO_TARGET_ID)
+    return ids
+  }
+  if (path) {
+    for (const id of path.nodeIds) ids.add(id)
+  }
+  return ids
+}
+
+export function configureDemoWorkspace(name = 'Alex Chen') {
+  completeOnboarding(name, true, 'Donald Trump', true)
   saveWarmthOverride(DEMO_BRIDGE_ID, {
     knownByUser: true,
     warmth: 0.85,
@@ -83,6 +116,9 @@ export function startInvestorDemo(name = 'Alex Chen') {
     confirmed: true,
     ratedAt: new Date().toISOString(),
   })
+}
+
+export function markDemoSessionActive() {
   try {
     sessionStorage.setItem(DEMO_MODE_KEY, '1')
     sessionStorage.setItem(DEMO_STEP_KEY, '1')
@@ -91,8 +127,14 @@ export function startInvestorDemo(name = 'Alex Chen') {
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new Event('sg-data-reloaded'))
   window.dispatchEvent(new Event(DEMO_STEP_EVENT))
+}
+
+export function startInvestorDemo(name = 'Alex Chen') {
+  configureDemoWorkspace(name)
+  ensureMegaGraph()
+  markDemoSessionActive()
+  window.dispatchEvent(new Event('sg-data-reloaded'))
 }
 
 /** After the walkthrough, drop into real contact import. */

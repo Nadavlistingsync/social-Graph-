@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
-import { startInvestorDemo } from './data/demoMode'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
 import { CONTACTS_GATE_EVENT, isContactsGateOpen, Onboarding } from './views/Onboarding'
@@ -17,7 +16,7 @@ import { Settings } from './views/Settings'
 
 function AppRoutes() {
   const { ready: authReady } = useAuth()
-  const { isOnboarded } = useGraph()
+  const { isOnboarded, startInvestorDemo: launchDemo } = useGraph()
   const [contactsGate, setContactsGate] = useState(isContactsGateOpen)
   const [params] = useSearchParams()
 
@@ -30,9 +29,9 @@ function AppRoutes() {
   useEffect(() => {
     if (!authReady) return
     if (params.get('demo') === '1') {
-      startInvestorDemo()
+      launchDemo()
     }
-  }, [authReady, params])
+  }, [authReady, params, launchDemo])
 
   if (!authReady) {
     return (
