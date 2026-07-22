@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
+import { DemoGuide } from './components/DemoGuide'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ContactImportProvider } from './context/ContactImportContext'
 import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
+import { startInvestorDemo } from './data/demoMode'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
 import { CONTACTS_GATE_EVENT, isContactsGateOpen, Onboarding } from './views/Onboarding'
@@ -17,12 +19,20 @@ function AppRoutes() {
   const { ready: authReady } = useAuth()
   const { isOnboarded } = useGraph()
   const [contactsGate, setContactsGate] = useState(isContactsGateOpen)
+  const [params] = useSearchParams()
 
   useEffect(() => {
     const sync = () => setContactsGate(isContactsGateOpen())
     window.addEventListener(CONTACTS_GATE_EVENT, sync)
     return () => window.removeEventListener(CONTACTS_GATE_EVENT, sync)
   }, [])
+
+  useEffect(() => {
+    if (!authReady) return
+    if (params.get('demo') === '1') {
+      startInvestorDemo()
+    }
+  }, [authReady, params])
 
   if (!authReady) {
     return (
@@ -39,16 +49,20 @@ function AppRoutes() {
   if (!isOnboarded || contactsGate) return <Onboarding />
 
   return (
-    <Routes>
-      <Route path="/" element={<GraphView />} />
-      <Route path="/find" element={<PathFinder />} />
-      <Route path="/rate" element={<RateContacts />} />
-      <Route path="/graph" element={<Navigate to="/" replace />} />
-      <Route path="/person/:id" element={<PersonPage />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/paths" element={<Navigate to="/find" replace />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<GraphView />} />
+        <Route path="/find" element={<PathFinder />} />
+        <Route path="/rate" element={<RateContacts />} />
+        <Route path="/graph" element={<Navigate to="/" replace />} />
+        <Route path="/person/:id" element={<PersonPage />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/paths" element={<Navigate to="/find" replace />} />
+        <Route path="/demo" element={<Navigate to={{ pathname: '/', search: '?demo=1' }} replace />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <DemoGuide />
+    </>
   )
 }
 

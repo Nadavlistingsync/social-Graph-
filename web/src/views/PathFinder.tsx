@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
+import { isDemoMode } from '../data/demoMode'
 import { Shell } from '../components/Shell'
 import { useGraph } from '../context/GraphContext'
 import { usePreferences } from '../context/PreferencesContext'
@@ -47,14 +48,24 @@ export function PathFinder() {
 
   useDocumentTitle(target ? `Intro to ${target.name}` : 'Find intro')
 
+  const inDemo = isDemoMode()
+
   return (
     <Shell active="paths">
       <div className="find-page" id="main-find">
+        {inDemo && (
+          <div className="demo-banner find-demo-banner" role="status">
+            <strong>Live demo</strong> · ranked intro to {target?.name ?? 'your target'} from your
+            warmest first hop
+          </div>
+        )}
         <div className="find-hero">
-          <p className="eyebrow">Coming into focus</p>
-          <h1>Who do you want to reach?</h1>
+          <p className="eyebrow">{inDemo ? 'Demo · warm intro path' : 'Coming into focus'}</p>
+          <h1>{inDemo ? 'Ask Jay Neveloff first' : 'Who do you want to reach?'}</h1>
           <p className="lede">
-            Pick someone. We’ll show the best person in your network to ask for an intro.
+            {inDemo
+              ? 'This is the payoff: one ranked person to ask, with the path behind them.'
+              : 'Pick someone. We’ll show the best person in your network to ask for an intro.'}
           </p>
 
           {people.length === 0 ? (

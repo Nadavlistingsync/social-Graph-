@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { NODE_TYPE_LABEL } from '../data/seed'
 import { getYouId } from '../data/graphStore'
+import { DEMO_BRIDGE_ID, DEMO_EXTENDED_EVENT, getDemoStep } from '../data/demoMode'
 import { getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
@@ -105,6 +106,18 @@ export function GraphView() {
 
   useEffect(() => {
     setSelectedId(focusId)
+  }, [focusId])
+
+  useEffect(() => {
+    const onExtended = () => setLayer('extended')
+    window.addEventListener(DEMO_EXTENDED_EVENT, onExtended)
+    return () => window.removeEventListener(DEMO_EXTENDED_EVENT, onExtended)
+  }, [])
+
+  useEffect(() => {
+    if (getDemoStep() === 2 && focusId === DEMO_BRIDGE_ID) {
+      setLayer('mine')
+    }
   }, [focusId])
 
   const strongEdges = useMemo(() => {

@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useAuth } from '../context/AuthContext'
 import { useGraph } from '../context/GraphContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { startInvestorDemo } from '../data/demoMode'
+import { PitchScreen } from './PitchScreen'
 import { RateContacts } from './RateContacts'
 
-type Step = 'auth' | 'intent' | 'profile' | 'contacts' | 'rate'
+type Step = 'pitch' | 'auth' | 'intent' | 'profile' | 'contacts' | 'rate'
 type AuthMode = 'signup' | 'signin'
 
 /** Kept after finishOnboarding so App still shows remaining onboarding steps. */
@@ -51,16 +53,17 @@ function closeContactsGate() {
 function gateStep(): Step {
   try {
     const s = sessionStorage.getItem('sg-onboarding-step')
-    if (s === 'contacts' || s === 'rate' || s === 'profile' || s === 'intent') return s
+    if (s === 'contacts' || s === 'rate' || s === 'profile' || s === 'intent' || s === 'auth')
+      return s
   } catch {
     /* ignore */
   }
-  return isContactsGateOpen() ? 'contacts' : 'auth'
+  return isContactsGateOpen() ? 'contacts' : 'pitch'
 }
 
 function rememberStep(step: Step) {
   try {
-    if (step === 'auth') sessionStorage.removeItem('sg-onboarding-step')
+    if (step === 'pitch' || step === 'auth') sessionStorage.removeItem('sg-onboarding-step')
     else sessionStorage.setItem('sg-onboarding-step', step)
   } catch {
     /* ignore */
@@ -69,6 +72,8 @@ function rememberStep(step: Step) {
 
 export function Onboarding() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const location = useLocation()
   const { user, ready, configured, signInWithPassword, signUpWithPassword } = useAuth()
   const { finishOnboarding, profile } = useGraph()
 
@@ -89,18 +94,33 @@ export function Onboarding() {
   }
 
   useDocumentTitle(
-    step === 'auth'
-      ? authMode === 'signup'
-        ? 'Create account'
-        : 'Log in'
-      : step === 'intent'
-        ? 'Who are you trying to meet?'
-        : step === 'profile'
-          ? 'Your map'
-          : step === 'rate'
-            ? 'Rate contacts'
-            : 'Contacts',
+    step === 'pitch'
+      ? 'Social Graph'
+      : step === 'auth'
+        ? authMode === 'signup'
+          ? 'Create account'
+          : 'Log in'
+        : step === 'intent'
+          ? 'Who are you trying to meet?'
+          : step === 'profile'
+            ? 'Your map'
+            : step === 'rate'
+              ? 'Rate contacts'
+              : 'Contacts',
   )
+
+  useEffect(() => {
+    if (!ready) return
+    if (params.get('demo') === '1' || location.pathname === '/demo') {
+      startInvestorDemo()
+      navigate('/', { replace: true })
+    }
+  }, [ready, params, location.pathname, navigate])
+
+  function handleStartDemo() {
+    startInvestorDemo()
+    navigate('/', { replace: true })
+  }
 
   useEffect(() => {
     if (!ready) return
@@ -186,6 +206,19 @@ export function Onboarding() {
           <p className="lede">Loading…</p>
         </div>
       </div>
+    )
+  }
+
+  if (step === 'pitch') {
+    return (
+      <PitchScreen
+        onStartDemo={handleStartDemo}
+        onContinue={() => setStep('intent')}
+        onSignIn={() => {
+          setAuthMode('signin')
+          setStep('auth')
+        }}
+      />
     )
   }
 
