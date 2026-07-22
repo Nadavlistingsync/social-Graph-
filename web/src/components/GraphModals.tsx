@@ -15,17 +15,15 @@ export function AddPersonModal({
   const { addPerson } = useGraph()
   const { setWarmth } = usePreferences()
   const [name, setName] = useState('')
-  const [summary, setSummary] = useState('')
-  const [known, setKnown] = useState(true)
   const [error, setError] = useState('')
+  const [justAdded, setJustAdded] = useState<string[]>([])
 
   if (!open) return null
 
   function reset() {
     setName('')
-    setSummary('')
-    setKnown(true)
     setError('')
+    setJustAdded([])
   }
 
   function submit(e: React.FormEvent) {
@@ -34,28 +32,35 @@ export function AddPersonModal({
     if (!trimmed) return
     const result = addPerson({
       name: trimmed,
-      summary,
+      summary: '',
       connectToId,
-      knownByUser: known,
+      knownByUser: true,
     })
     if (!result.ok) {
       setError(result.error)
       return
     }
-    if (known) setWarmth(result.id, { knownByUser: true, warmth: 0.8 })
+    setWarmth(result.id, { knownByUser: true, warmth: 0.8 })
+    setJustAdded((prev) => [...prev, trimmed])
+    setName('')
+    setError('')
+  }
+
+  function done() {
     reset()
     onClose()
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
+    <div className="modal-backdrop" onClick={done} role="presentation">
       <div
         className="modal"
         role="dialog"
         aria-labelledby="add-person-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="add-person-title">Add person</h2>
+        <h2 id="add-person-title">Add people</h2>
+        <p className="section-hint">Type a name and hit Enter. Keep going — then Done.</p>
         <form onSubmit={submit}>
           <div className="field">
             <label className="field-label" htmlFor="person-name">
@@ -65,33 +70,28 @@ export function AddPersonModal({
               id="person-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
+              placeholder="e.g. Alex Chen"
               autoFocus
+              autoComplete="off"
             />
           </div>
-          <div className="field">
-            <label className="field-label" htmlFor="person-summary">
-              Summary <span className="optional">optional</span>
-            </label>
-            <textarea
-              id="person-summary"
-              className="notes-box"
-              rows={3}
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              placeholder="How you know them, what they do…"
-            />
-          </div>
-          <label className="warmth-toggle">
-            <input type="checkbox" checked={known} onChange={(e) => setKnown(e.target.checked)} />I
-            know them
-          </label>
+          {justAdded.length > 0 && (
+            <p className="add-people-trail" aria-live="polite">
+              Added {justAdded.slice(-5).join(' · ')}
+              {justAdded.length > 5 ? ` · +${justAdded.length - 5} more` : ''}
+            </p>
+          )}
           {error && <p className="form-error">{error}</p>}
           <div className="modal-actions">
-            <button type="button" className="chip" onClick={onClose}>
-              Cancel
+            <button type="button" className="chip" onClick={done}>
+              Done
             </button>
-            <button type="submit" className="btn-primary" style={{ width: 'auto' }}>
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ width: 'auto' }}
+              disabled={!name.trim()}
+            >
               Add
             </button>
           </div>

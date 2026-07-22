@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { detectAndParseContacts, parsePastedContacts } from '../data/contactImport'
 import { useGraph } from '../context/GraphContext'
 import { pickDeviceContacts, isDevicePickerAvailable } from '../lib/deviceContacts'
@@ -19,25 +19,6 @@ type ContactAuthPanelProps = {
   compact?: boolean
 }
 
-type FileKind = 'google' | 'microsoft' | 'apple' | 'linkedin' | 'any'
-
-const FILE_ACCEPT: Record<FileKind, string> = {
-  google: '.csv,text/csv',
-  microsoft: '.csv,text/csv',
-  apple: '.vcf,text/vcard,text/x-vcard',
-  linkedin: '.csv,text/csv',
-  any: '.vcf,.csv,text/vcard,text/x-vcard,text/csv',
-}
-
-const FILE_HINT: Record<FileKind, string> = {
-  google: 'Google Contacts → Export → Google CSV, then pick that file.',
-  microsoft: 'Outlook → File → Open & Export → Export to a file → Comma Separated Values.',
-  apple: 'Contacts app → select All Contacts → File → Export → Export vCard (.vcf).',
-  linkedin:
-    'LinkedIn → Settings → Data privacy → Get a copy of your data → Connections → upload Connections.csv.',
-  any: 'Use a .vcf (Apple) or .csv (Google / LinkedIn / Outlook) file.',
-}
-
 export function ContactAuthPanel({
   onSuccess,
   onSkip,
@@ -46,29 +27,26 @@ export function ContactAuthPanel({
 }: ContactAuthPanelProps) {
   const { importContacts } = useGraph()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [loading, setLoading] = useState<
-    'google' | 'microsoft' | 'apple' | 'linkedin' | 'device' | 'file' | 'paste' | null
-  >(null)
+  const [loading, setLoading] = useState<'paste' | 'file' | 'device' | 'google' | 'microsoft' | null>(
+    null,
+  )
   const [error, setError] = useState('')
-  const [hint, setHint] = useState('')
   const [result, setResult] = useState<{
     imported: number
     skipped: number
     merged: number
   } | null>(null)
   const [dragOver, setDragOver] = useState(false)
-  const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
-  const [fileKind, setFileKind] = useState<FileKind>('any')
 
   const googleReady = isGoogleContactsAvailable()
   const microsoftReady = isMicrosoftContactsAvailable()
   const deviceReady = isDevicePickerAvailable()
+  const preview = useMemo(() => parsePastedContacts(pasteText), [pasteText])
 
   function finish(imported: number, skipped: number, merged: number, warmthIds: string[]) {
     setResult({ imported, skipped, merged })
     setLoading(null)
-    setHint('')
     onSuccess?.(imported + merged, skipped, warmthIds)
   }
 
@@ -77,13 +55,12 @@ export function ContactAuthPanel({
     fetcher: () => Promise<Awaited<ReturnType<typeof detectAndParseContacts>>>,
   ) {
     setError('')
-    setHint('')
     setResult(null)
     setLoading(source)
     try {
       const contacts = await fetcher()
       if (!contacts.length) {
-        setError('No contacts returned. Try another option or upload a file.')
+        setError('No contacts found. Try pasting names or uploading a file.')
         setLoading(null)
         return
       }
@@ -98,38 +75,6 @@ export function ContactAuthPanel({
       setError(e instanceof Error ? e.message : 'Import failed')
       setLoading(null)
     }
-  }
-
-  function openFilePicker(kind: FileKind, loadingKey: typeof loading = 'file') {
-    setError('')
-    setResult(null)
-    setHint(FILE_HINT[kind])
-    setFileKind(kind)
-    setLoading(loadingKey)
-    // Defer so accept attribute updates before the dialog opens.
-    requestAnimationFrame(() => {
-      fileRef.current?.click()
-      // If the user cancels the dialog, clear the loading spinner.
-      window.setTimeout(() => {
-        setLoading((prev) => (prev === loadingKey ? null : prev))
-      }, 800)
-    })
-  }
-
-  function handleGoogle() {
-    if (googleReady) {
-      void runImport('google', fetchGoogleContacts)
-      return
-    }
-    openFilePicker('google', 'google')
-  }
-
-  function handleMicrosoft() {
-    if (microsoftReady) {
-      void runImport('microsoft', fetchMicrosoftContacts)
-      return
-    }
-    openFilePicker('microsoft', 'microsoft')
   }
 
   async function handleFiles(files: File[]) {
@@ -155,14 +100,12 @@ export function ContactAuthPanel({
         }
       }
       if (!sawFile) {
-        setError(FILE_HINT[fileKind] || FILE_HINT.any)
+        setError('Drop a .vcf or .csv contacts file.')
         setLoading(null)
         return
       }
       if (!imported && !merged) {
-        setError(
-          'No contacts found in that file. For LinkedIn, upload Connections.csv from the unzipped export.',
-        )
+        setError('No contacts found in that file.')
         setLoading(null)
         return
       }
@@ -175,12 +118,11 @@ export function ContactAuthPanel({
 
   function handlePaste() {
     setError('')
-    setHint('')
     setResult(null)
     setLoading('paste')
     const contacts = parsePastedContacts(pasteText)
     if (!contacts.length) {
-      setError('Paste one name per line, optionally with an email.')
+      setError('Add at least one name — one per line, or comma-separated.')
       setLoading(null)
       return
     }
@@ -191,7 +133,6 @@ export function ContactAuthPanel({
       return
     }
     setPasteText('')
-    setPasteOpen(false)
     finish(res.imported, res.skipped, res.merged, res.warmthIds)
   }
 
@@ -210,12 +151,13 @@ export function ContactAuthPanel({
       <div className="import-result">
         <strong>
           Added {result.imported}
-          {result.merged ? ` · merged ${result.merged}` : ''} contacts
+          {result.merged ? ` · merged ${result.merged}` : ''}{' '}
+          {result.imported + result.merged === 1 ? 'person' : 'people'}
         </strong>
         {result.skipped > 0 && (
           <p className="section-hint">Skipped {result.skipped} incomplete rows.</p>
         )}
-        <p className="section-hint">Next: score how well you know them.</p>
+        <p className="section-hint">Next: how well do you know them?</p>
       </div>
     )
   }
@@ -230,163 +172,125 @@ export function ContactAuthPanel({
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
-      <div className="auth-buttons">
-        <button
-          type="button"
-          className="auth-btn google"
-          disabled={Boolean(loading)}
-          onClick={handleGoogle}
-        >
-          <span className="auth-icon" aria-hidden>
-            G
+      <div className="paste-first">
+        <label className="field-label" htmlFor="paste-people">
+          Type or paste names
+        </label>
+        <textarea
+          id="paste-people"
+          className="paste-hero"
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          rows={compact ? 5 : 7}
+          autoFocus
+          placeholder={'Alex Chen\nSam Rivera\nJordan Lee, jordan@acme.com'}
+          aria-label="Type or paste names"
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && pasteText.trim()) {
+              e.preventDefault()
+              handlePaste()
+            }
+          }}
+        />
+        <div className="paste-first-meta">
+          <span className="section-hint">
+            {preview.length
+              ? `${preview.length} ${preview.length === 1 ? 'person' : 'people'} ready`
+              : 'One per line, or comma-separated'}
           </span>
-          {loading === 'google'
-            ? googleReady
-              ? 'Signing in…'
-              : 'Choose Google CSV…'
-            : 'Google Contacts'}
-        </button>
-
-        <button
-          type="button"
-          className="auth-btn apple"
-          disabled={Boolean(loading)}
-          onClick={() => openFilePicker('apple', 'apple')}
-        >
-          <span className="auth-icon" aria-hidden>
-            A
-          </span>
-          {loading === 'apple' ? 'Choose vCard…' : 'Apple Contacts'}
-        </button>
-
-        <button
-          type="button"
-          className="auth-btn linkedin"
-          disabled={Boolean(loading)}
-          onClick={() => openFilePicker('linkedin', 'linkedin')}
-        >
-          <span className="auth-icon" aria-hidden>
-            in
-          </span>
-          {loading === 'linkedin' ? 'Choose Connections.csv…' : 'LinkedIn Connections'}
-        </button>
-
-        {deviceReady && (
-          <button
-            type="button"
-            className="auth-btn device"
-            disabled={Boolean(loading)}
-            onClick={() => runImport('device', pickDeviceContacts)}
-          >
-            {loading === 'device' ? 'Opening…' : 'This phone / Mac contacts'}
-          </button>
-        )}
-
-        <button
-          type="button"
-          className="auth-btn microsoft"
-          disabled={Boolean(loading)}
-          onClick={handleMicrosoft}
-        >
-          <span className="auth-icon" aria-hidden>
-            M
-          </span>
-          {loading === 'microsoft'
-            ? microsoftReady
-              ? 'Signing in…'
-              : 'Choose Outlook CSV…'
-            : 'Microsoft Outlook'}
-        </button>
-      </div>
-
-      {hint && <p className="import-action-hint">{hint}</p>}
-
-      <button
-        type="button"
-        className="auth-btn device"
-        disabled={Boolean(loading)}
-        onClick={() => setPasteOpen((v) => !v)}
-      >
-        {pasteOpen ? 'Hide paste list' : 'Paste a list of names'}
-      </button>
-
-      {pasteOpen && (
-        <div className="paste-contacts">
-          <textarea
-            value={pasteText}
-            onChange={(e) => setPasteText(e.target.value)}
-            rows={5}
-            placeholder={'Alex Chen, alex@acme.com\nSam Rivera\nJordan Lee <jordan@example.com>'}
-            aria-label="Paste contacts"
-          />
           <button
             type="button"
             className="btn-primary"
-            disabled={Boolean(loading) || !pasteText.trim()}
+            disabled={Boolean(loading) || preview.length === 0}
             onClick={handlePaste}
           >
-            {loading === 'paste' ? 'Importing…' : 'Import pasted contacts'}
+            {loading === 'paste'
+              ? 'Adding…'
+              : preview.length
+                ? `Add ${preview.length}`
+                : 'Add people'}
           </button>
         </div>
-      )}
-
-      <div className="auth-divider">
-        <span>or drop a file here</span>
       </div>
 
-      <div
-        className="drop-zone inline"
-        onClick={() => openFilePicker('any', 'file')}
-        onKeyDown={(e) => e.key === 'Enter' && openFilePicker('any', 'file')}
-        role="button"
-        tabIndex={0}
-      >
-        {loading === 'file'
-          ? 'Reading file…'
-          : 'Apple .vcf · Google CSV · LinkedIn Connections.csv'}
+      <div className="easy-secondary">
+        <button
+          type="button"
+          className="chip on"
+          disabled={Boolean(loading)}
+          onClick={() => {
+            setError('')
+            fileRef.current?.click()
+          }}
+        >
+          {loading === 'file' ? 'Reading…' : 'Upload file'}
+        </button>
+        {deviceReady && (
+          <button
+            type="button"
+            className="chip"
+            disabled={Boolean(loading)}
+            onClick={() => void runImport('device', pickDeviceContacts)}
+          >
+            {loading === 'device' ? 'Opening…' : 'From this device'}
+          </button>
+        )}
+        {googleReady && (
+          <button
+            type="button"
+            className="chip"
+            disabled={Boolean(loading)}
+            onClick={() => void runImport('google', fetchGoogleContacts)}
+          >
+            {loading === 'google' ? 'Signing in…' : 'Google'}
+          </button>
+        )}
+        {microsoftReady && (
+          <button
+            type="button"
+            className="chip"
+            disabled={Boolean(loading)}
+            onClick={() => void runImport('microsoft', fetchMicrosoftContacts)}
+          >
+            {loading === 'microsoft' ? 'Signing in…' : 'Outlook'}
+          </button>
+        )}
       </div>
+
+      <p className="drop-hint section-hint">Or drop a .vcf / .csv anywhere on this card</p>
+
       <input
         ref={fileRef}
         type="file"
-        accept={FILE_ACCEPT[fileKind]}
+        accept=".vcf,.csv,text/vcard,text/x-vcard,text/csv"
         multiple
         hidden
         onChange={(e) => {
           const list = e.target.files ? [...e.target.files] : []
           if (list.length) void handleFiles(list)
-          else setLoading(null)
           e.target.value = ''
         }}
       />
 
       <details className="import-help">
-        <summary>How to export</summary>
+        <summary>Need a contacts export?</summary>
         <ul>
           <li>
-            <strong>Google</strong> — Contacts → Export → Google CSV
-            {googleReady ? ', or use one-click sign-in above.' : '.'}
+            <strong>Google</strong> — Contacts → Export → Google CSV → Upload file
           </li>
           <li>
-            <strong>Apple</strong> — Contacts app → All Contacts → File → Export → Export vCard.
+            <strong>Apple</strong> — Contacts → File → Export vCard → Upload file
           </li>
           <li>
-            <strong>LinkedIn</strong> — Settings → Data privacy → Get a copy of your data →
-            Connections → upload <code>Connections.csv</code>.
+            <strong>LinkedIn</strong> — Settings → Get a copy of your data → Connections.csv
           </li>
           <li>
-            <strong>Outlook</strong> — Export contacts as CSV
-            {microsoftReady ? ', or use one-click sign-in above.' : '.'}
+            <strong>Outlook</strong> — Export contacts as CSV → Upload file
           </li>
         </ul>
-        <p className="section-hint">
-          Optional live sync: add OAuth Client IDs in Settings (or <code>VITE_GOOGLE_CLIENT_ID</code>{' '}
-          / <code>VITE_MICROSOFT_CLIENT_ID</code> on deploy).
-        </p>
       </details>
 
-      <p className="section-hint auth-hint">
-        Names and emails only. Stays private to you (and syncs if you’re signed in).
-      </p>
+      <p className="section-hint auth-hint">Private to you. Syncs if you’re signed in.</p>
 
       {error && <p className="form-error">{error}</p>}
 

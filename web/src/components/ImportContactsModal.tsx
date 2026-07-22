@@ -14,7 +14,6 @@ export function ImportContactsModal({
   const navigate = useNavigate()
   const { importFiles } = useContactImport()
   const [dragOver, setDragOver] = useState(false)
-  const [dropping, setDropping] = useState(false)
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -22,9 +21,7 @@ export function ImportContactsModal({
       setDragOver(false)
       const files = [...e.dataTransfer.files].filter(isContactsFile)
       if (!files.length) return
-      setDropping(true)
       const result = await importFiles(files)
-      setDropping(false)
       if (result && result.imported > 0) {
         onClose()
         navigate('/rate')
@@ -49,14 +46,8 @@ export function ImportContactsModal({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <h2 id="import-contacts-title">Add your contacts</h2>
-        <p className="section-hint">
-          Google, Apple, LinkedIn, or paste — then rate how well you know them.
-        </p>
-
-        <div className="drop-zone">
-          {dropping ? 'Importing…' : 'Drop .vcf or .csv here (Apple, Google, or LinkedIn)'}
-        </div>
+        <h2 id="import-contacts-title">Add people you know</h2>
+        <p className="section-hint">Paste names, upload a file, or drop one here.</p>
 
         <ContactAuthPanel
           onSuccess={() => {
