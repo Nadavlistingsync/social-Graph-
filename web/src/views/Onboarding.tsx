@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useAuth } from '../context/AuthContext'
 import { useGraph } from '../context/GraphContext'
@@ -11,6 +11,8 @@ type AuthMode = 'signup' | 'signin'
 
 /** Kept after finishOnboarding so App still shows remaining onboarding steps. */
 export const CONTACTS_GATE_KEY = 'sg-pending-contacts'
+/** Fired when the contacts gate opens/closes so App can re-read sessionStorage. */
+export const CONTACTS_GATE_EVENT = 'sg-contacts-gate'
 
 export function isContactsGateOpen(): boolean {
   try {
@@ -20,12 +22,21 @@ export function isContactsGateOpen(): boolean {
   }
 }
 
+function notifyContactsGate() {
+  try {
+    window.dispatchEvent(new Event(CONTACTS_GATE_EVENT))
+  } catch {
+    /* ignore */
+  }
+}
+
 function openContactsGate() {
   try {
     sessionStorage.setItem(CONTACTS_GATE_KEY, '1')
   } catch {
     /* ignore */
   }
+  notifyContactsGate()
 }
 
 function closeContactsGate() {
@@ -34,6 +45,7 @@ function closeContactsGate() {
   } catch {
     /* ignore */
   }
+  notifyContactsGate()
 }
 
 function gateStep(): Step {
@@ -104,7 +116,8 @@ export function Onboarding() {
   function leaveToApp() {
     closeContactsGate()
     rememberStep('auth')
-    navigate('/')
+    // Same-path navigate is a no-op; gate event above remounts routes in App.
+    navigate('/', { replace: true })
   }
 
   async function handleAuth(e: FormEvent) {
@@ -207,9 +220,9 @@ export function Onboarding() {
             compact
           />
           <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-            <Link to="/" onClick={closeContactsGate}>
+            <button type="button" className="text-btn" onClick={leaveToApp}>
               Skip to empty map →
-            </Link>
+            </button>
           </p>
         </div>
       </div>

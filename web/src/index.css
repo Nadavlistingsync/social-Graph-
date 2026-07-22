@@ -977,6 +977,12 @@ button {
   transform: translateY(-1px);
 }
 
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .verdict {
   margin-top: 1.5rem;
   padding: 1.15rem 1.2rem;

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -6,7 +7,7 @@ import { GraphProvider, useGraph } from './context/GraphContext'
 import { PreferencesProvider } from './context/PreferencesContext'
 import { GraphView } from './views/GraphView'
 import { NotFound } from './views/NotFound'
-import { isContactsGateOpen, Onboarding } from './views/Onboarding'
+import { CONTACTS_GATE_EVENT, isContactsGateOpen, Onboarding } from './views/Onboarding'
 import { PersonPage } from './views/PersonPage'
 import { PathFinder } from './views/PathFinder'
 import { RateContacts } from './views/RateContacts'
@@ -15,6 +16,13 @@ import { Settings } from './views/Settings'
 function AppRoutes() {
   const { ready: authReady } = useAuth()
   const { isOnboarded } = useGraph()
+  const [contactsGate, setContactsGate] = useState(isContactsGateOpen)
+
+  useEffect(() => {
+    const sync = () => setContactsGate(isContactsGateOpen())
+    window.addEventListener(CONTACTS_GATE_EVENT, sync)
+    return () => window.removeEventListener(CONTACTS_GATE_EVENT, sync)
+  }, [])
 
   if (!authReady) {
     return (
@@ -28,7 +36,7 @@ function AppRoutes() {
   }
 
   // Contacts / rate steps run after finishOnboarding so imports + scoring can write.
-  if (!isOnboarded || isContactsGateOpen()) return <Onboarding />
+  if (!isOnboarded || contactsGate) return <Onboarding />
 
   return (
     <Routes>
