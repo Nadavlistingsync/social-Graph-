@@ -101,11 +101,6 @@ export function GraphView() {
 
   useDocumentTitle('Network')
 
-  const onlyYou = useMemo(() => {
-    void version
-    return nodes.filter((n) => n.type === 'person').length <= 1
-  }, [nodes, version])
-
   useEffect(() => {
     setSelectedId(focusId)
   }, [focusId])
@@ -128,6 +123,9 @@ export function GraphView() {
     }
     return direct
   }, [strongEdges, nodes, version, prefVersion, getWarmth])
+
+  // Intro target stubs without a link to You don't count as a built network yet.
+  const showEmptyCta = myPeople.size === 0 && !profile.loadSample
 
   const visibleNodeIds = useMemo(() => {
     const ids = new Set<string>([YOU_ID])
@@ -331,7 +329,7 @@ export function GraphView() {
           <svg ref={svgRef} role="img" aria-label="Your network map">
             <g ref={gRef} />
           </svg>
-          {onlyYou && (
+          {showEmptyCta && (
             <div className="graph-empty-cta">
               <strong>Your map is empty</strong>
               <p>
