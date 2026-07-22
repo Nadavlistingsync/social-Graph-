@@ -12,6 +12,8 @@ import {
   addEdge as storeAddEdge,
   addPerson as storeAddPerson,
   completeOnboarding,
+  enrichCustomNetwork,
+  getCustomNodes,
   getEdges,
   getNodes,
   getProfile,
@@ -25,6 +27,7 @@ import {
   updateProfile,
   type WorkspaceProfile,
 } from '../data/graphStore'
+import { buildEnrichmentCandidates } from '../data/enrichNetwork'
 import { saveWarmthOverride } from '../data/preferences'
 import type { ParsedContact } from '../data/contactImport'
 
@@ -60,6 +63,13 @@ type GraphContextValue = {
   ) =>
     | { ok: true; imported: number; skipped: number; merged: number; warmthIds: string[] }
     | { ok: false; error: string }
+  enrichNetwork: (opts?: {
+    anchorId?: string
+    useAi?: boolean
+  }) => Promise<
+    | { ok: true; added: number; skipped: number; groups: number }
+    | { ok: false; error: string }
+  >
   resetAll: () => void
 }
 
@@ -169,7 +179,6 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       importContacts: (contacts) => {
         const result = storeImportContacts(contacts)
         if (!result.ok) return result
-        // Don't auto-mark everyone as known — rating step sets warmth.
         bump()
         return {
           ok: true,
@@ -178,6 +187,20 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           merged: result.merged,
           warmthIds: result.warmthIds,
         }
+      },
+      enrichNetwork: async (opts) => {
+        const custom = getCustomNodes().filter((n) => n.type === 'person')
+        if (custom.length < 2) {
+          return { ok: false, error: 'Add at least 2 people to expand their network.' }
+        }
+        const built = await buildEnrichmentCandidates(custom, getEdges(), opts)
+        if (built.wouldAdd === 0) {
+          return { ok: true, added: 0, skipped: built.wouldSkip, groups: built.groups }
+        }
+        const applied = enrichCustomNetwork({ candidates: built.candidates })
+        if (!applied.ok) return applied
+        bump()
+        return applied
       },
       resetAll: () => {
         resetWorkspace()

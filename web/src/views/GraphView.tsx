@@ -87,13 +87,15 @@ function fitToNodes(
 
 export function GraphView() {
   const navigate = useNavigate()
-  const { nodes, edges, version, youId } = useGraph()
+  const { nodes, edges, version, youId, enrichNetwork } = useGraph()
   const { version: prefVersion, getWarmth } = usePreferences()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
   const [selectedId, setSelectedId] = useState(focusId)
   const [layer, setLayer] = useState<Layer>('mine')
   const [fitTick, setFitTick] = useState(0)
+  const [enrichBusy, setEnrichBusy] = useState(false)
+  const [enrichNote, setEnrichNote] = useState('')
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const nodesRef = useRef<SimNode[]>([])
@@ -298,6 +300,26 @@ export function GraphView() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  async function handleExpandNetwork(anchorId?: string) {
+    setEnrichBusy(true)
+    setEnrichNote('')
+    const result = await enrichNetwork({ anchorId, useAi: true })
+    setEnrichBusy(false)
+    if (!result.ok) {
+      setEnrichNote(result.error)
+      return
+    }
+    if (result.added > 0) {
+      setLayer('extended')
+      setEnrichNote(
+        `Added ${result.added} likely connection${result.added === 1 ? '' : 's'} — switch to Their network to explore.`,
+      )
+      setFitTick((n) => n + 1)
+    } else {
+      setEnrichNote('No new connections found yet. Import more contacts with work emails or companies.')
+    }
+  }
+
   return (
     <Shell active="graph">
       <div className="graph-layout" id="main-graph">
@@ -322,7 +344,16 @@ export function GraphView() {
             <button type="button" className="chip" onClick={() => setFitTick((n) => n + 1)}>
               Fit
             </button>
+            <button
+              type="button"
+              className="chip on"
+              disabled={enrichBusy}
+              onClick={() => void handleExpandNetwork()}
+            >
+              {enrichBusy ? 'Expanding…' : 'Expand network'}
+            </button>
           </div>
+          {enrichNote && <div className="enrich-toast">{enrichNote}</div>}
           <svg ref={svgRef} role="img" aria-label="Your network map">
             <g ref={gRef} />
           </svg>
@@ -361,6 +392,16 @@ export function GraphView() {
                       onClick={() => navigate(`/find?to=${selected.id}`)}
                     >
                       Find intro
+                    </button>
+                  )}
+                  {selected.type === 'person' && selected.id !== YOU_ID && (
+                    <button
+                      type="button"
+                      className="btn-quiet"
+                      disabled={enrichBusy}
+                      onClick={() => void handleExpandNetwork(selected.id)}
+                    >
+                      {enrichBusy ? 'Expanding…' : 'Their connections'}
                     </button>
                   )}
                 </div>

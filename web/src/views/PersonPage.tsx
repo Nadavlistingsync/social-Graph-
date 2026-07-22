@@ -15,9 +15,11 @@ const YOU_ID = getYouId()
 export function PersonPage() {
   const { id = 'donald-trump' } = useParams()
   const navigate = useNavigate()
-  const { version: graphVersion } = useGraph()
+  const { version: graphVersion, enrichNetwork } = useGraph()
   const { version, getWarmth, setWarmth, isAwkward, setAwkward } = usePreferences()
   const [connOpen, setConnOpen] = useState(false)
+  const [enrichBusy, setEnrichBusy] = useState(false)
+  const [enrichNote, setEnrichNote] = useState('')
   const node = getNode(id)
   const storageKey = `sg-notes-${id}`
 
@@ -166,10 +168,34 @@ export function PersonPage() {
           <section className="note-section">
             <div className="section-header-row">
               <h2>Relationships</h2>
-              <button type="button" className="chip" onClick={() => setConnOpen(true)}>
-                + Add connection
-              </button>
+              <div className="section-header-actions">
+                {node.type === 'person' && node.id !== YOU_ID && (
+                  <button
+                    type="button"
+                    className="chip"
+                    disabled={enrichBusy}
+                    onClick={async () => {
+                      setEnrichBusy(true)
+                      setEnrichNote('')
+                      const result = await enrichNetwork({ anchorId: node.id, useAi: true })
+                      setEnrichBusy(false)
+                      if (!result.ok) setEnrichNote(result.error)
+                      else if (result.added > 0) {
+                        setEnrichNote(`Added ${result.added} likely connection${result.added === 1 ? '' : 's'}.`)
+                      } else {
+                        setEnrichNote('No new connections found from public/contact data yet.')
+                      }
+                    }}
+                  >
+                    {enrichBusy ? 'Expanding…' : 'Expand their network'}
+                  </button>
+                )}
+                <button type="button" className="chip" onClick={() => setConnOpen(true)}>
+                  + Add connection
+                </button>
+              </div>
             </div>
+            {enrichNote && <p className="section-hint enrich-note">{enrichNote}</p>}
             {rels.length === 0 && (
               <div className="empty-state" style={{ padding: '1rem 0' }}>
                 No relationships recorded yet.

@@ -1,6 +1,11 @@
 import { demoEdges, demoNodes } from './seed'
 import { importContactsIntoWorkspace, type ContactImportResult } from './contactImportBatch'
 import type { ParsedContact } from './contactImport'
+import {
+  candidatesFromNodes,
+  mergeEnrichmentIntoGraph,
+  type EnrichmentCandidate,
+} from './enrichment'
 import type { GraphEdge, GraphNode } from './types'
 import { notifyUserDataChanged } from './syncBus'
 
@@ -103,6 +108,45 @@ export function getEdges(): GraphEdge[] {
   return [...sample, ...ws.customEdges]
 }
 
+export function getCustomNodes(): GraphNode[] {
+  return readWorkspace().customNodes
+}
+
+export function enrichCustomNetwork(opts?: {
+  anchorId?: string
+  candidates?: EnrichmentCandidate[]
+}): { ok: true; added: number; skipped: number; groups: number } | { ok: false; error: string } {
+  const ws = readWorkspace()
+  if (!ws.profile.onboarded) return { ok: false, error: 'Complete setup first' }
+
+  const people = ws.customNodes.filter((n) => n.type === 'person')
+  if (people.length < 2 && !opts?.candidates?.length) {
+    return { ok: true, added: 0, skipped: 0, groups: 0 }
+  }
+
+  const existing = getEdges()
+  let pool: EnrichmentCandidate[]
+  let groups = 0
+
+  if (opts?.candidates?.length) {
+    pool = opts.candidates
+  } else {
+    const local = candidatesFromNodes(people, { anchorId: opts?.anchorId })
+    pool = local.candidates
+    groups = local.groups.length
+  }
+
+  const { edges, added, skipped } = mergeEnrichmentIntoGraph(existing, pool)
+
+  for (const edge of edges) {
+    if (!ws.customEdges.some((e) => e.id === edge.id)) {
+      ws.customEdges.push(edge)
+    }
+  }
+  if (added > 0) writeWorkspace(ws)
+  return { ok: true, added, skipped, groups }
+}
+
 export function slugify(name: string, existingIds: Set<string>): string {
   let base =
     name
@@ -182,6 +226,12 @@ export function importContacts(
   const existingNodes = getNodes()
   const result = importContactsIntoWorkspace(ws, existingNodes, contacts)
   writeWorkspace(ws)
+
+  // Link imported contacts who share a work domain or employer (their network).
+  if (result.imported + result.merged > 0) {
+    enrichCustomNetwork()
+  }
+
   return { ok: true, ...result }
 }
 
