@@ -254,6 +254,15 @@ export function PersonPage() {
               placeholder="Private — only you see this"
             />
           </section>
+
+          {node.id !== YOU_ID && (
+            <section className="note-section">
+              <button type="button" className="chip" onClick={onRemove}>
+                Remove from graph
+              </button>
+              {removeError && <p className="form-error">{removeError}</p>}
+            </section>
+          )}
         </article>
 
         <aside className="note-aside">
@@ -270,17 +279,6 @@ export function PersonPage() {
               Find intro
             </button>
           )}
-          {node.id !== YOU_ID && (
-            <button
-              type="button"
-              className="chip"
-              style={{ marginTop: '0.5rem' }}
-              onClick={onRemove}
-            >
-              Remove
-            </button>
-          )}
-          {removeError && <p className="form-error">{removeError}</p>}
         </aside>
       </div>
       <AddConnectionModal
