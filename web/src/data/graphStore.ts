@@ -121,6 +121,9 @@ export function slugify(name: string, existingIds: Set<string>): string {
 export function completeOnboarding(name: string, loadSample: boolean, targetPerson?: string): void {
   const trimmed = name.trim()
   if (!trimmed) return
+  const existing = readWorkspace()
+  // Preserve contacts if the user somehow re-enters setup after importing.
+  const keepCustoms = existing.profile.onboarded
   writeWorkspace({
     profile: {
       name: trimmed,
@@ -129,8 +132,8 @@ export function completeOnboarding(name: string, loadSample: boolean, targetPers
       loadSample,
       targetPerson: targetPerson?.trim() || undefined,
     },
-    customNodes: [],
-    customEdges: [],
+    customNodes: keepCustoms ? existing.customNodes : [],
+    customEdges: keepCustoms ? existing.customEdges : [],
   })
 }
 
@@ -172,6 +175,33 @@ export function addEdge(edge: GraphEdge): { ok: true } | { ok: false; error: str
   return { ok: true }
 }
 
+/** Remove a custom person (and their edges). Demo/sample nodes cannot be deleted. */
+export function removePerson(nodeId: string): { ok: true } | { ok: false; error: string } {
+  if (nodeId === YOU_ID) return { ok: false, error: 'You cannot remove yourself' }
+  const ws = readWorkspace()
+  const idx = ws.customNodes.findIndex((n) => n.id === nodeId)
+  if (idx < 0) {
+    return { ok: false, error: 'Only people you added (or imported) can be removed' }
+  }
+  ws.customNodes.splice(idx, 1)
+  ws.customEdges = ws.customEdges.filter((e) => e.source !== nodeId && e.target !== nodeId)
+  writeWorkspace(ws)
+  try {
+    localStorage.removeItem(`sg-notes-${nodeId}`)
+    const warmthRaw = localStorage.getItem('sg-warmth-v1')
+    if (warmthRaw) {
+      const warmth = JSON.parse(warmthRaw) as Record<string, unknown>
+      if (nodeId in warmth) {
+        delete warmth[nodeId]
+        localStorage.setItem('sg-warmth-v1', JSON.stringify(warmth))
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { ok: true }
+}
+
 export function importContacts(
   contacts: ParsedContact[],
 ): ({ ok: true } & ContactImportResult) | { ok: false; error: string } {
@@ -198,6 +228,7 @@ export function resetWorkspace(): void {
     localStorage.removeItem(WORKSPACE_KEY)
     localStorage.removeItem('sg-warmth-v1')
     localStorage.removeItem('sg-awkward-edges-v1')
+    localStorage.removeItem('sg-updated-at-v1')
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i)
       if (key?.startsWith('sg-notes-')) localStorage.removeItem(key)

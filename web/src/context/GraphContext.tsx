@@ -19,6 +19,7 @@ import {
   importContacts as storeImportContacts,
   isOnboarded,
   migrateLegacyUser,
+  removePerson as storeRemovePerson,
   resetWorkspace,
   setLoadSample,
   slugify,
@@ -43,7 +44,8 @@ type GraphContextValue = {
       name: string
       summary?: string
       type?: GraphNode['type']
-      connectToId?: string
+      /** Pass null to add a person with no connection yet (e.g. Find target). */
+      connectToId?: string | null
       edgeType?: GraphEdge['type']
       knownByUser?: boolean
     },
@@ -60,6 +62,7 @@ type GraphContextValue = {
   ) =>
     | { ok: true; imported: number; skipped: number; merged: number; warmthIds: string[] }
     | { ok: false; error: string }
+  removePerson: (nodeId: string) => { ok: true } | { ok: false; error: string }
   resetAll: () => void
 }
 
@@ -113,7 +116,8 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           tags: [],
           timeline: [{ date: new Date().toISOString().slice(0, 7), label: 'Added to your graph' }],
         }
-        const connectToId = input.connectToId ?? getYouId()
+        const connectToId =
+          input.connectToId === null ? null : (input.connectToId ?? getYouId())
         let edge: GraphEdge | undefined
         if (connectToId && connectToId !== id) {
           edge = {
@@ -178,6 +182,11 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           merged: result.merged,
           warmthIds: result.warmthIds,
         }
+      },
+      removePerson: (nodeId) => {
+        const result = storeRemovePerson(nodeId)
+        if (result.ok) bump()
+        return result
       },
       resetAll: () => {
         resetWorkspace()

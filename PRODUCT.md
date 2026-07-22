@@ -4,19 +4,22 @@
 
 Not a CRM. A small relationship map for warm intros.
 
-## Three screens
+## Core screens
 
 1. **Network** — see people you know, then who they know
 2. **Find** — pick a target → see who to ask for an intro
 3. **Note** — open a person; mark warmth / awkward intros
+4. **Rate** — score imported contacts (AI + swipe confirm)
+5. **Settings** — account, sync, OAuth client IDs, backup
 
 ## Automatic vs manual
 
 | Automatic | Manual |
 |-----------|--------|
-| Public relationships + sources | Who you actually know (saved locally) |
+| Public relationships + sources | Who you actually know (saved locally / synced) |
 | Path search + ranking | Private notes |
 | Link strength from evidence | “This intro is awkward” judgment |
+| AI relationship scores | Swipe / 1–10 confirm |
 
 Public structure is automatic. Access is manual. A weak mention is never a warm intro.
 

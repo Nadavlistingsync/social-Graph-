@@ -13,13 +13,14 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 const YOU_ID = getYouId()
 
 export function PersonPage() {
-  const { id = 'donald-trump' } = useParams()
+  const { id } = useParams()
   const navigate = useNavigate()
-  const { version: graphVersion } = useGraph()
+  const { version: graphVersion, removePerson } = useGraph()
   const { version, getWarmth, setWarmth, isAwkward, setAwkward } = usePreferences()
   const [connOpen, setConnOpen] = useState(false)
-  const node = getNode(id)
-  const storageKey = `sg-notes-${id}`
+  const [removeError, setRemoveError] = useState<string | null>(null)
+  const node = id ? getNode(id) : undefined
+  const storageKey = id ? `sg-notes-${id}` : 'sg-notes-unknown'
 
   useDocumentTitle(node?.name)
 
@@ -40,6 +41,7 @@ export function PersonPage() {
   }, [node, storageKey])
 
   useEffect(() => {
+    if (!id) return
     saveNote(id, notes)
   }, [notes, id])
 
@@ -61,14 +63,25 @@ export function PersonPage() {
 
   const warmth = node ? getWarmth(node) : null
 
-  if (!node) {
+  if (!id || !node) {
     return (
       <Shell active="person">
         <div className="empty-state">
-          Not found. <Link to="/">Back</Link>
+          Not found. <Link to="/">Back to network</Link>
         </div>
       </Shell>
     )
+  }
+
+  function onRemove() {
+    setRemoveError(null)
+    if (!window.confirm(`Remove ${node!.name} from your graph?`)) return
+    const result = removePerson(node!.id)
+    if (!result.ok) {
+      setRemoveError(result.error)
+      return
+    }
+    navigate('/')
   }
 
   return (
@@ -241,6 +254,15 @@ export function PersonPage() {
               placeholder="Private — only you see this"
             />
           </section>
+
+          {node.id !== YOU_ID && (
+            <section className="note-section">
+              <button type="button" className="chip" onClick={onRemove}>
+                Remove from graph
+              </button>
+              {removeError && <p className="form-error">{removeError}</p>}
+            </section>
+          )}
         </article>
 
         <aside className="note-aside">

@@ -259,5 +259,5 @@ export function RateContacts({
   )
 
   if (embedded) return body
-  return <Shell active="settings">{body}</Shell>
+  return <Shell active="rate">{body}</Shell>
 }

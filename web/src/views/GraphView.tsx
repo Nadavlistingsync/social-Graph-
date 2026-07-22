@@ -17,6 +17,7 @@ import { getEdgesForNode, getNode, otherEnd } from '../data/paths'
 import type { GraphEdge, GraphNode } from '../data/types'
 import { Shell } from '../components/Shell'
 import { useGraph } from '../context/GraphContext'
+import { useContactImport } from '../context/ContactImportContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
@@ -88,6 +89,7 @@ function fitToNodes(
 export function GraphView() {
   const navigate = useNavigate()
   const { nodes, edges, version, youId } = useGraph()
+  const { openImport } = useContactImport()
   const { version: prefVersion, getWarmth } = usePreferences()
   const [params, setParams] = useSearchParams()
   const focusId = params.get('focus') ?? YOU_ID
@@ -298,6 +300,8 @@ export function GraphView() {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  const networkEmpty = myPeople.size === 0
+
   return (
     <Shell active="graph">
       <div className="graph-layout" id="main-graph">
@@ -326,11 +330,26 @@ export function GraphView() {
           <svg ref={svgRef} role="img" aria-label="Your network map">
             <g ref={gRef} />
           </svg>
-          <div className="graph-hint">
-            {layer === 'mine'
-              ? 'People you know · pinch to zoom · tap someone'
-              : 'People your people know · pinch to zoom · tap someone'}
-          </div>
+          {networkEmpty ? (
+            <div className="graph-empty-overlay">
+              <strong>Your network is empty</strong>
+              <p>Import contacts or add someone you know to start mapping intros.</p>
+              <div className="panel-actions">
+                <button type="button" className="btn-primary" onClick={openImport}>
+                  Import contacts
+                </button>
+                <button type="button" className="btn-quiet" onClick={() => navigate('/rate')}>
+                  Rate contacts
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="graph-hint">
+              {layer === 'mine'
+                ? 'People you know · pinch to zoom · tap someone'
+                : 'People your people know · pinch to zoom · tap someone'}
+            </div>
+          )}
         </div>
         <aside className="side-panel">
           {selected ? (

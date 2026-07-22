@@ -3,12 +3,18 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
 import { useGraph } from '../context/GraphContext'
+import { useContactImport } from '../context/ContactImportContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
+function normalizeName(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 export function PathFinder() {
-  const { version, youId, nodes, profile } = useGraph()
-  const { version: prefVersion } = usePreferences()
+  const { version, youId, nodes, profile, addPerson } = useGraph()
+  const { openImport } = useContactImport()
+  const { version: prefVersion, setWarmth } = usePreferences()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const people = useMemo(() => {
@@ -16,22 +22,61 @@ export function PathFinder() {
     return nodes.filter((n) => n.type === 'person' && n.id !== youId)
   }, [nodes, youId, version])
 
-  const defaultTarget = profile.loadSample ? 'donald-trump' : people[0]?.id ?? ''
+  const intentName = profile.targetPerson?.trim() || ''
+  const intentMatch = useMemo(() => {
+    if (!intentName) return null
+    const needle = normalizeName(intentName)
+    return (
+      people.find((p) => normalizeName(p.name) === needle) ||
+      people.find((p) => normalizeName(p.name).includes(needle) || needle.includes(normalizeName(p.name))) ||
+      null
+    )
+  }, [people, intentName])
+
+  const defaultTarget =
+    intentMatch?.id ||
+    (profile.loadSample && people.some((p) => p.id === 'donald-trump')
+      ? 'donald-trump'
+      : people[0]?.id ?? '')
   const paramTarget = params.get('to')
   const initial =
     paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : defaultTarget
   const [targetId, setTargetId] = useState(initial)
+  const [addError, setAddError] = useState<string | null>(null)
 
   useEffect(() => {
     const next = params.get('to')
     if (next && people.some((p) => p.id === next) && next !== targetId) {
       setTargetId(next)
+      return
     }
-  }, [params, people, targetId])
+    // Wire onboarding target → Find when no explicit ?to=
+    if (!next && intentMatch && intentMatch.id !== targetId) {
+      setTargetId(intentMatch.id)
+      setParams({ to: intentMatch.id }, { replace: true })
+    }
+  }, [params, people, targetId, intentMatch, setParams])
 
   function chooseTarget(id: string) {
     setTargetId(id)
     setParams(id ? { to: id } : {}, { replace: true })
+  }
+
+  function addTargetPerson() {
+    if (!intentName) return
+    setAddError(null)
+    const result = addPerson({
+      name: intentName,
+      summary: 'Target from setup — add connections to find an intro path.',
+      knownByUser: false,
+      connectToId: null,
+    })
+    if (!result.ok) {
+      setAddError(result.error)
+      return
+    }
+    setWarmth(result.id, { knownByUser: false, warmth: 0.2 })
+    chooseTarget(result.id)
   }
 
   const paths = useMemo(() => {
@@ -60,13 +105,39 @@ export function PathFinder() {
           {people.length === 0 ? (
             <div className="verdict">
               <strong>Build your network first</strong>
-              <p>Add people you know, then come back here.</p>
-              <button type="button" className="btn-primary" onClick={() => navigate('/')}>
-                Open network
-              </button>
+              <p>
+                {intentName
+                  ? `Import or add people you know, then we’ll look for a path to ${intentName}.`
+                  : 'Import contacts or add people you know, then come back here.'}
+              </p>
+              <div className="panel-actions">
+                <button type="button" className="btn-primary" onClick={openImport}>
+                  Import contacts
+                </button>
+                <button type="button" className="btn-quiet" onClick={() => navigate('/')}>
+                  Open network
+                </button>
+              </div>
+              {intentName && (
+                <button type="button" className="text-btn" onClick={addTargetPerson}>
+                  Add {intentName} as a target
+                </button>
+              )}
+              {addError && <p className="form-error">{addError}</p>}
             </div>
           ) : (
             <>
+              {intentName && !intentMatch && (
+                <div className="verdict" style={{ marginBottom: '1rem' }}>
+                  <strong>{intentName} isn’t in your map yet</strong>
+                  <p>Add them as a target, then connect people who might know them.</p>
+                  <button type="button" className="btn-primary" onClick={addTargetPerson}>
+                    Add {intentName}
+                  </button>
+                  {addError && <p className="form-error">{addError}</p>}
+                </div>
+              )}
+
               <div className="field">
                 <label className="field-label" htmlFor="to">
                   Person
