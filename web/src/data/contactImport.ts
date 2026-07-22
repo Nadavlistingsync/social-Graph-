@@ -296,37 +296,67 @@ export function detectAndParseContacts(raw: string, filename?: string): ParsedCo
   return parsePastedContacts(raw)
 }
 
-/** Paste lines like `Name` or `Name, email@x.com` or `Name <email@x.com>`. */
-export function parsePastedContacts(raw: string): ParsedContact[] {
-  const contacts: ParsedContact[] = []
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#')) continue
-    let name = trimmed
-    let email: string | undefined
+function parsePasteChunk(chunk: string): ParsedContact | null {
+  const trimmed = chunk.trim()
+  if (!trimmed || trimmed.startsWith('#')) return null
+  let name = trimmed
+  let email: string | undefined
 
-    const angle = trimmed.match(/^(.+?)\s*<([\w.+-]+@[\w.-]+\.\w+)>\s*$/)
-    if (angle) {
-      name = angle[1].trim()
-      email = angle[2].toLowerCase()
+  const angle = trimmed.match(/^(.+?)\s*<([\w.+-]+@[\w.-]+\.\w+)>\s*$/)
+  if (angle) {
+    name = angle[1].trim()
+    email = angle[2].toLowerCase()
+  } else {
+    const comma = trimmed.split(',').map((s) => s.trim())
+    if (comma.length >= 2 && /@/.test(comma[comma.length - 1] || '')) {
+      email = comma[comma.length - 1].toLowerCase()
+      name = comma.slice(0, -1).join(', ')
     } else {
-      const comma = trimmed.split(',').map((s) => s.trim())
-      if (comma.length >= 2 && /@/.test(comma[comma.length - 1] || '')) {
-        email = comma[comma.length - 1].toLowerCase()
-        name = comma.slice(0, -1).join(', ')
-      } else {
-        const spaced = trimmed.match(/^(.+?)\s+([\w.+-]+@[\w.-]+\.\w+)\s*$/)
-        if (spaced) {
-          name = spaced[1].trim()
-          email = spaced[2].toLowerCase()
-        }
+      const spaced = trimmed.match(/^(.+?)\s+([\w.+-]+@[\w.-]+\.\w+)\s*$/)
+      if (spaced) {
+        name = spaced[1].trim()
+        email = spaced[2].toLowerCase()
       }
     }
-
-    name = name.replace(/^["']|["']$/g, '').trim()
-    if (name.length < 2) continue
-    contacts.push({ name, email, source: 'paste' })
   }
+
+  name = name.replace(/^["']|["']$/g, '').trim()
+  if (name.length < 2) return null
+  return { name, email, source: 'paste' }
+}
+
+/**
+ * Paste names any way that's easy:
+ * - one per line
+ * - `Name, email@x.com` / `Name <email@x.com>`
+ * - comma / semicolon / tab separated on one line (`Alex, Sam, Jordan`)
+ */
+export function parsePastedContacts(raw: string): ParsedContact[] {
+  const text = raw.replace(/^\uFEFF/, '').trim()
+  if (!text) return []
+
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const contacts: ParsedContact[] = []
+  const seen = new Set<string>()
+
+  function push(c: ParsedContact | null) {
+    if (!c) return
+    const key = `${c.name.toLowerCase()}|${c.email ?? ''}`
+    if (seen.has(key)) return
+    seen.add(key)
+    contacts.push(c)
+  }
+
+  for (const line of lines) {
+    // Single-line list of people with no emails → split on commas / semicolons / tabs.
+    const hasEmail = /@/.test(line)
+    if (!hasEmail && /[,;\t]/.test(line)) {
+      for (const part of line.split(/[,;\t]+/)) push(parsePasteChunk(part))
+      continue
+    }
+    push(parsePasteChunk(line))
+  }
+
   return contacts
 }
 

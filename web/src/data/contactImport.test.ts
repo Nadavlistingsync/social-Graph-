@@ -5,6 +5,7 @@ import {
   parseGoogleCsv,
   parseLinkedInCsv,
   parseOutlookCsv,
+  parsePastedContacts,
   parseVcard,
 } from './contactImport'
 
@@ -106,5 +107,22 @@ describe('importContacts', () => {
       expect(second.merged).toBe(2)
       expect(second.imported).toBe(0)
     }
+  })
+})
+
+describe('parsePastedContacts', () => {
+  it('parses one name per line with optional emails', () => {
+    const contacts = parsePastedContacts(
+      'Alex Chen\nSam Rivera, sam@x.com\nJordan Lee <jordan@acme.com>',
+    )
+    expect(contacts).toHaveLength(3)
+    expect(contacts[0]).toMatchObject({ name: 'Alex Chen', source: 'paste' })
+    expect(contacts[1]).toMatchObject({ name: 'Sam Rivera', email: 'sam@x.com' })
+    expect(contacts[2]).toMatchObject({ name: 'Jordan Lee', email: 'jordan@acme.com' })
+  })
+
+  it('splits a comma-separated name list on one line', () => {
+    const contacts = parsePastedContacts('Alex Chen, Sam Rivera, Jordan Lee')
+    expect(contacts.map((c) => c.name)).toEqual(['Alex Chen', 'Sam Rivera', 'Jordan Lee'])
   })
 })

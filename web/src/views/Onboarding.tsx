@@ -208,11 +208,8 @@ export function Onboarding() {
       <div className="onboarding">
         <div className="onboarding-card onboarding-wide" id="main">
           <div className="brand-mark">Social Graph</div>
-          <h1>Upload your people</h1>
-          <p className="lede">
-            Google, Apple, LinkedIn, or paste a list. Then we’ll score how well you know each
-            person.
-          </p>
+          <h1>Who do you know?</h1>
+          <p className="lede">Paste a few names — or upload a contacts file. Takes under a minute.</p>
           <ContactAuthPanel
             showSkip
             onSkip={leaveToApp}
@@ -221,7 +218,7 @@ export function Onboarding() {
           />
           <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
             <button type="button" className="text-btn" onClick={leaveToApp}>
-              Skip to empty map →
+              Skip for now →
             </button>
           </p>
         </div>
