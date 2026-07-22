@@ -11,13 +11,31 @@ import {
   isGoogleContactsAvailable,
   isMicrosoftContactsAvailable,
 } from '../lib/oauthConfig'
-import { OAuthSetupSheet } from './OAuthSetupSheet'
 
 type ContactAuthPanelProps = {
   onSuccess?: (imported: number, skipped: number, warmthIds: string[]) => void
   onSkip?: () => void
   showSkip?: boolean
   compact?: boolean
+}
+
+type FileKind = 'google' | 'microsoft' | 'apple' | 'linkedin' | 'any'
+
+const FILE_ACCEPT: Record<FileKind, string> = {
+  google: '.csv,text/csv',
+  microsoft: '.csv,text/csv',
+  apple: '.vcf,text/vcard,text/x-vcard',
+  linkedin: '.csv,text/csv',
+  any: '.vcf,.csv,text/vcard,text/x-vcard,text/csv',
+}
+
+const FILE_HINT: Record<FileKind, string> = {
+  google: 'Google Contacts → Export → Google CSV, then pick that file.',
+  microsoft: 'Outlook → File → Open & Export → Export to a file → Comma Separated Values.',
+  apple: 'Contacts app → select All Contacts → File → Export → Export vCard (.vcf).',
+  linkedin:
+    'LinkedIn → Settings → Data privacy → Get a copy of your data → Connections → upload Connections.csv.',
+  any: 'Use a .vcf (Apple) or .csv (Google / LinkedIn / Outlook) file.',
 }
 
 export function ContactAuthPanel({
@@ -28,19 +46,20 @@ export function ContactAuthPanel({
 }: ContactAuthPanelProps) {
   const { importContacts } = useGraph()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [loading, setLoading] = useState<'google' | 'microsoft' | 'device' | 'file' | 'paste' | null>(
-    null,
-  )
+  const [loading, setLoading] = useState<
+    'google' | 'microsoft' | 'apple' | 'linkedin' | 'device' | 'file' | 'paste' | null
+  >(null)
   const [error, setError] = useState('')
+  const [hint, setHint] = useState('')
   const [result, setResult] = useState<{
     imported: number
     skipped: number
     merged: number
   } | null>(null)
-  const [setupProvider, setSetupProvider] = useState<'google' | 'microsoft' | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
+  const [fileKind, setFileKind] = useState<FileKind>('any')
 
   const googleReady = isGoogleContactsAvailable()
   const microsoftReady = isMicrosoftContactsAvailable()
@@ -49,6 +68,7 @@ export function ContactAuthPanel({
   function finish(imported: number, skipped: number, merged: number, warmthIds: string[]) {
     setResult({ imported, skipped, merged })
     setLoading(null)
+    setHint('')
     onSuccess?.(imported + merged, skipped, warmthIds)
   }
 
@@ -57,6 +77,7 @@ export function ContactAuthPanel({
     fetcher: () => Promise<Awaited<ReturnType<typeof detectAndParseContacts>>>,
   ) {
     setError('')
+    setHint('')
     setResult(null)
     setLoading(source)
     try {
@@ -79,20 +100,36 @@ export function ContactAuthPanel({
     }
   }
 
+  function openFilePicker(kind: FileKind, loadingKey: typeof loading = 'file') {
+    setError('')
+    setResult(null)
+    setHint(FILE_HINT[kind])
+    setFileKind(kind)
+    setLoading(loadingKey)
+    // Defer so accept attribute updates before the dialog opens.
+    requestAnimationFrame(() => {
+      fileRef.current?.click()
+      // If the user cancels the dialog, clear the loading spinner.
+      window.setTimeout(() => {
+        setLoading((prev) => (prev === loadingKey ? null : prev))
+      }, 800)
+    })
+  }
+
   function handleGoogle() {
-    if (!googleReady) {
-      setSetupProvider('google')
+    if (googleReady) {
+      void runImport('google', fetchGoogleContacts)
       return
     }
-    void runImport('google', fetchGoogleContacts)
+    openFilePicker('google', 'google')
   }
 
   function handleMicrosoft() {
-    if (!microsoftReady) {
-      setSetupProvider('microsoft')
+    if (microsoftReady) {
+      void runImport('microsoft', fetchMicrosoftContacts)
       return
     }
-    void runImport('microsoft', fetchMicrosoftContacts)
+    openFilePicker('microsoft', 'microsoft')
   }
 
   async function handleFiles(files: File[]) {
@@ -118,7 +155,7 @@ export function ContactAuthPanel({
         }
       }
       if (!sawFile) {
-        setError('Use a .vcf (Apple) or .csv (Google / LinkedIn) file.')
+        setError(FILE_HINT[fileKind] || FILE_HINT.any)
         setLoading(null)
         return
       }
@@ -138,6 +175,7 @@ export function ContactAuthPanel({
 
   function handlePaste() {
     setError('')
+    setHint('')
     setResult(null)
     setLoading('paste')
     const contacts = parsePastedContacts(pasteText)
@@ -202,7 +240,35 @@ export function ContactAuthPanel({
           <span className="auth-icon" aria-hidden>
             G
           </span>
-          {loading === 'google' ? 'Signing in…' : 'Google Contacts'}
+          {loading === 'google'
+            ? googleReady
+              ? 'Signing in…'
+              : 'Choose Google CSV…'
+            : 'Google Contacts'}
+        </button>
+
+        <button
+          type="button"
+          className="auth-btn apple"
+          disabled={Boolean(loading)}
+          onClick={() => openFilePicker('apple', 'apple')}
+        >
+          <span className="auth-icon" aria-hidden>
+            A
+          </span>
+          {loading === 'apple' ? 'Choose vCard…' : 'Apple Contacts'}
+        </button>
+
+        <button
+          type="button"
+          className="auth-btn linkedin"
+          disabled={Boolean(loading)}
+          onClick={() => openFilePicker('linkedin', 'linkedin')}
+        >
+          <span className="auth-icon" aria-hidden>
+            in
+          </span>
+          {loading === 'linkedin' ? 'Choose Connections.csv…' : 'LinkedIn Connections'}
         </button>
 
         {deviceReady && (
@@ -225,9 +291,15 @@ export function ContactAuthPanel({
           <span className="auth-icon" aria-hidden>
             M
           </span>
-          {loading === 'microsoft' ? 'Signing in…' : 'Microsoft Outlook'}
+          {loading === 'microsoft'
+            ? microsoftReady
+              ? 'Signing in…'
+              : 'Choose Outlook CSV…'
+            : 'Microsoft Outlook'}
         </button>
       </div>
+
+      {hint && <p className="import-action-hint">{hint}</p>}
 
       <button
         type="button"
@@ -259,13 +331,13 @@ export function ContactAuthPanel({
       )}
 
       <div className="auth-divider">
-        <span>or upload a file</span>
+        <span>or drop a file here</span>
       </div>
 
       <div
         className="drop-zone inline"
-        onClick={() => fileRef.current?.click()}
-        onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
+        onClick={() => openFilePicker('any', 'file')}
+        onKeyDown={(e) => e.key === 'Enter' && openFilePicker('any', 'file')}
         role="button"
         tabIndex={0}
       >
@@ -276,12 +348,13 @@ export function ContactAuthPanel({
       <input
         ref={fileRef}
         type="file"
-        accept=".vcf,.csv,text/vcard,text/x-vcard,text/csv"
+        accept={FILE_ACCEPT[fileKind]}
         multiple
         hidden
         onChange={(e) => {
           const list = e.target.files ? [...e.target.files] : []
           if (list.length) void handleFiles(list)
+          else setLoading(null)
           e.target.value = ''
         }}
       />
@@ -290,17 +363,25 @@ export function ContactAuthPanel({
         <summary>How to export</summary>
         <ul>
           <li>
-            <strong>Google</strong> — tap Google Contacts above, or Contacts → Export → Google CSV.
+            <strong>Google</strong> — Contacts → Export → Google CSV
+            {googleReady ? ', or use one-click sign-in above.' : '.'}
           </li>
           <li>
-            <strong>Apple</strong> — Contacts app → select All Contacts → File → Export → Export
-            vCard (.vcf).
+            <strong>Apple</strong> — Contacts app → All Contacts → File → Export → Export vCard.
           </li>
           <li>
-            <strong>LinkedIn</strong> — Settings → Data privacy → Get a copy of your data → check
-            Connections → download → unzip → upload <code>Connections.csv</code>.
+            <strong>LinkedIn</strong> — Settings → Data privacy → Get a copy of your data →
+            Connections → upload <code>Connections.csv</code>.
+          </li>
+          <li>
+            <strong>Outlook</strong> — Export contacts as CSV
+            {microsoftReady ? ', or use one-click sign-in above.' : '.'}
           </li>
         </ul>
+        <p className="section-hint">
+          Optional live sync: add OAuth Client IDs in Settings (or <code>VITE_GOOGLE_CLIENT_ID</code>{' '}
+          / <code>VITE_MICROSOFT_CLIENT_ID</code> on deploy).
+        </p>
       </details>
 
       <p className="section-hint auth-hint">
@@ -313,18 +394,6 @@ export function ContactAuthPanel({
         <button type="button" className="text-btn skip-auth" onClick={onSkip} disabled={Boolean(loading)}>
           Skip for now
         </button>
-      )}
-
-      {setupProvider && (
-        <OAuthSetupSheet
-          provider={setupProvider}
-          onClose={() => setSetupProvider(null)}
-          onSaved={() => {
-            setSetupProvider(null)
-            if (setupProvider === 'google') handleGoogle()
-            else handleMicrosoft()
-          }}
-        />
       )}
     </div>
   )

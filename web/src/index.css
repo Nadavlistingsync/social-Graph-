@@ -1481,6 +1481,18 @@ button {
   border-color: #2f2f2f;
 }
 
+.auth-btn.apple {
+  background: #fff;
+  color: #1d1d1f;
+  border-color: #d2d2d7;
+}
+
+.auth-btn.linkedin {
+  background: #0a66c2;
+  color: #fff;
+  border-color: #0a66c2;
+}
+
 .auth-btn.device {
   background: var(--bg);
   border-color: var(--accent-dim);
@@ -1504,6 +1516,25 @@ button {
 
 .auth-btn.microsoft .auth-icon {
   color: #00a4ef;
+}
+
+.auth-btn.apple .auth-icon {
+  color: #1d1d1f;
+}
+
+.auth-btn.linkedin .auth-icon {
+  color: #fff;
+  font-size: 0.7rem;
+  letter-spacing: -0.04em;
+}
+
+.import-action-hint {
+  margin: 0.35rem 0 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.4;
 }
 
 .auth-hint {
