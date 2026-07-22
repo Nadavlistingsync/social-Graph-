@@ -13,12 +13,12 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 const YOU_ID = getYouId()
 
 export function PersonPage() {
-  const { id = 'donald-trump' } = useParams()
+  const { id = '' } = useParams()
   const navigate = useNavigate()
   const { version: graphVersion } = useGraph()
   const { version, getWarmth, setWarmth, isAwkward, setAwkward } = usePreferences()
   const [connOpen, setConnOpen] = useState(false)
-  const node = getNode(id)
+  const node = id ? getNode(id) : undefined
   const storageKey = `sg-notes-${id}`
 
   useDocumentTitle(node?.name)

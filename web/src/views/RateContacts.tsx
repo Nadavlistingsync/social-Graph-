@@ -25,7 +25,7 @@ export function RateContacts({
   onComplete?: () => void
 }) {
   const navigate = useNavigate()
-  const { nodes, profile, version } = useGraph()
+  const { nodes, profile, version, customPersonIds, resolveTarget } = useGraph()
   const { getWarmth, setWarmth } = usePreferences()
   const { user } = useAuth()
   const [phase, setPhase] = useState<Phase>('scoring')
@@ -40,10 +40,16 @@ export function RateContacts({
 
   useDocumentTitle('Rate contacts')
 
+  // Score imported / added contacts — not the illustrative sample graph.
   const people = useMemo(() => {
     void version
-    return nodes.filter((n) => n.id !== YOU_ID && n.type === 'person')
-  }, [nodes, version])
+    const custom = nodes.filter(
+      (n) => n.id !== YOU_ID && n.type === 'person' && customPersonIds.has(n.id),
+    )
+    if (custom.length) return custom
+    // Fallback: if user only has sample data, skip rating (nothing personal to score).
+    return []
+  }, [nodes, version, customPersonIds])
 
   const currentId = queue[index]
   const current = people.find((p) => p.id === currentId)
@@ -149,6 +155,11 @@ export function RateContacts({
     navigate(path)
   }
 
+  function finishToFind() {
+    const id = resolveTarget(profile.targetPersonId || profile.targetPerson)
+    finishToMap(id ? `/find?to=${encodeURIComponent(id)}` : '/find')
+  }
+
   const body = (
     <div className={`rate-flow ${embedded ? 'embedded' : ''}`} id={embedded ? 'main' : undefined}>
       {phase === 'scoring' && (
@@ -232,12 +243,12 @@ export function RateContacts({
           <h1>Your map is ready</h1>
           <p className="lede">
             {people.length
-              ? `${people.length} people scored. Open the network, then find paths to anyone.`
-              : 'Import contacts anytime from the Contacts button.'}
+              ? `${people.length} contacts scored. Open the network, then find paths to anyone.`
+              : 'Import contacts anytime from the Contacts button — then come back to rate them.'}
           </p>
           {profile.targetPerson && (
             <p className="section-hint">
-              Looking for <strong>{profile.targetPerson}</strong>? Try Find intro next.
+              Looking for <strong>{profile.targetPerson}</strong>? Find intro is ready.
             </p>
           )}
           <div className="rate-done-actions">
@@ -245,13 +256,15 @@ export function RateContacts({
               See my network
             </button>
             {profile.targetPerson && (
-              <button type="button" className="btn-quiet" onClick={() => finishToMap('/find')}>
+              <button type="button" className="btn-quiet" onClick={finishToFind}>
                 Find path to {profile.targetPerson.split(' ')[0]}
               </button>
             )}
-            <button type="button" className="text-btn" onClick={() => void runScoring()}>
-              Re-score with AI
-            </button>
+            {people.length > 0 && (
+              <button type="button" className="text-btn" onClick={() => void runScoring()}>
+                Re-score with AI
+              </button>
+            )}
           </div>
         </div>
       )}

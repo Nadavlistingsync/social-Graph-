@@ -36,6 +36,13 @@ function closeContactsGate() {
   }
 }
 
+/** Close the post-onboarding contacts overlay and remount app routes. */
+export function dismissContactsGate() {
+  closeContactsGate()
+  rememberStep('auth')
+  window.dispatchEvent(new Event('sg-data-reloaded'))
+}
+
 function gateStep(): Step {
   try {
     const s = sessionStorage.getItem('sg-onboarding-step')
@@ -102,8 +109,7 @@ export function Onboarding() {
   }, [ready, user, step, name])
 
   function leaveToApp() {
-    closeContactsGate()
-    rememberStep('auth')
+    dismissContactsGate()
     navigate('/')
   }
 
@@ -182,8 +188,7 @@ export function Onboarding() {
         <RateContacts
           embedded
           onComplete={() => {
-            closeContactsGate()
-            rememberStep('auth')
+            dismissContactsGate()
           }}
         />
       </div>
@@ -207,7 +212,7 @@ export function Onboarding() {
             compact
           />
           <p className="section-hint" style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-            <Link to="/" onClick={closeContactsGate}>
+            <Link to="/" onClick={() => dismissContactsGate()}>
               Skip to empty map →
             </Link>
           </p>

@@ -14,6 +14,8 @@ export type WorkspaceProfile = {
   loadSample: boolean
   /** Who you're trying to meet — sets pathfinding intent */
   targetPerson?: string
+  /** Resolved node id for targetPerson when present in the graph */
+  targetPersonId?: string
 }
 
 export type Workspace = {
@@ -121,17 +123,86 @@ export function slugify(name: string, existingIds: Set<string>): string {
 export function completeOnboarding(name: string, loadSample: boolean, targetPerson?: string): void {
   const trimmed = name.trim()
   if (!trimmed) return
+  const target = targetPerson?.trim() || undefined
   writeWorkspace({
     profile: {
       name: trimmed,
       summary: defaultWorkspace().profile.summary,
       onboarded: true,
       loadSample,
-      targetPerson: targetPerson?.trim() || undefined,
+      targetPerson: target,
     },
     customNodes: [],
     customEdges: [],
   })
+  if (target) ensureTargetPerson(target)
+}
+
+/** Custom (user-added / imported) person ids — excludes demo sample nodes. */
+export function getCustomPersonIds(): Set<string> {
+  const ws = readWorkspace()
+  return new Set(ws.customNodes.filter((n) => n.type === 'person').map((n) => n.id))
+}
+
+export function findPersonByName(name: string): GraphNode | undefined {
+  const needle = name.trim().toLowerCase()
+  if (!needle) return undefined
+  return getNodes().find((n) => n.type === 'person' && n.name.toLowerCase() === needle)
+}
+
+/**
+ * Ensure the onboarding / Find target exists as a person node.
+ * Creates a stub with no edge to You (they're a goal, not a contact yet).
+ */
+export function ensureTargetPerson(name: string): { id: string; changed: boolean } | null {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  const ws = readWorkspace()
+  if (!ws.profile.onboarded) return null
+
+  const existing = findPersonByName(trimmed)
+  if (existing) {
+    const already =
+      ws.profile.targetPersonId === existing.id && ws.profile.targetPerson === existing.name
+    if (!already) {
+      ws.profile.targetPerson = existing.name
+      ws.profile.targetPersonId = existing.id
+      writeWorkspace(ws)
+    }
+    return { id: existing.id, changed: !already }
+  }
+
+  const ids = new Set(getNodes().map((n) => n.id))
+  const id = slugify(trimmed, ids)
+  const node: GraphNode = {
+    id,
+    name: trimmed,
+    type: 'person',
+    summary: 'Target you’re trying to reach. Add connections or import people who know them.',
+    tags: ['bridge person'],
+    timeline: [{ date: new Date().toISOString().slice(0, 7), label: 'Added as intro target' }],
+  }
+  ws.customNodes.push(node)
+  ws.profile.targetPerson = trimmed
+  ws.profile.targetPersonId = id
+  writeWorkspace(ws)
+  return { id, changed: true }
+}
+
+export function resolveTargetId(nameOrId?: string | null): { id: string; changed: boolean } | null {
+  if (!nameOrId?.trim()) {
+    const profile = getProfile()
+    if (profile.targetPersonId && getNodes().some((n) => n.id === profile.targetPersonId)) {
+      return { id: profile.targetPersonId, changed: false }
+    }
+    if (profile.targetPerson) return ensureTargetPerson(profile.targetPerson)
+    return null
+  }
+  const value = nameOrId.trim()
+  if (getNodes().some((n) => n.id === value)) return { id: value, changed: false }
+  const byName = findPersonByName(value)
+  if (byName) return { id: byName.id, changed: false }
+  return ensureTargetPerson(value)
 }
 
 export function updateProfile(patch: Partial<WorkspaceProfile>): void {

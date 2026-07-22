@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { bestFirstHop, findPaths, getNode } from '../data/paths'
 import { Shell } from '../components/Shell'
@@ -7,7 +7,7 @@ import { usePreferences } from '../context/PreferencesContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 export function PathFinder() {
-  const { version, youId, nodes, profile } = useGraph()
+  const { version, youId, nodes, profile, resolveTarget, ensureTarget } = useGraph()
   const { version: prefVersion } = usePreferences()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -16,23 +16,51 @@ export function PathFinder() {
     return nodes.filter((n) => n.type === 'person' && n.id !== youId)
   }, [nodes, youId, version])
 
-  const defaultTarget = profile.loadSample ? 'donald-trump' : people[0]?.id ?? ''
-  const paramTarget = params.get('to')
-  const initial =
-    paramTarget && people.some((p) => p.id === paramTarget) ? paramTarget : defaultTarget
-  const [targetId, setTargetId] = useState(initial)
+  const defaultTarget =
+    profile.targetPersonId ||
+    (profile.loadSample ? 'donald-trump' : people[0]?.id ?? '')
+  const paramRaw = params.get('to') || params.get('q')
+
+  const [targetId, setTargetId] = useState(() => {
+    if (paramRaw) {
+      const hit = people.find((p) => p.id === paramRaw || p.name.toLowerCase() === paramRaw.toLowerCase())
+      if (hit) return hit.id
+    }
+    if (defaultTarget && people.some((p) => p.id === defaultTarget)) return defaultTarget
+    return people[0]?.id || ''
+  })
+  const [query, setQuery] = useState(() => getNode(targetId)?.name ?? profile.targetPerson ?? '')
 
   useEffect(() => {
-    const next = params.get('to')
-    if (next && people.some((p) => p.id === next) && next !== targetId) {
+    const raw = params.get('to') || params.get('q')
+    if (!raw) return
+    const next = resolveTarget(raw)
+    if (next && next !== targetId) {
       setTargetId(next)
+      setQuery(getNode(next)?.name ?? raw)
     }
-  }, [params, people, targetId])
+  }, [params, resolveTarget, targetId])
 
   function chooseTarget(id: string) {
     setTargetId(id)
+    const name = getNode(id)?.name
+    if (name) setQuery(name)
     setParams(id ? { to: id } : {}, { replace: true })
   }
+
+  function submitSearch(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = query.trim()
+    if (!trimmed) return
+    const id = ensureTarget(trimmed)
+    if (id) chooseTarget(id)
+  }
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return people.slice(0, 12)
+    return people.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 12)
+  }, [people, query])
 
   const paths = useMemo(() => {
     void version
@@ -54,7 +82,7 @@ export function PathFinder() {
           <p className="eyebrow">Coming into focus</p>
           <h1>Who do you want to reach?</h1>
           <p className="lede">
-            Pick someone. We’ll show the best person in your network to ask for an intro.
+            Search or pick someone. We’ll show the best person in your network to ask for an intro.
           </p>
 
           {people.length === 0 ? (
@@ -67,29 +95,69 @@ export function PathFinder() {
             </div>
           ) : (
             <>
-              <div className="field">
-                <label className="field-label" htmlFor="to">
+              <form className="field" onSubmit={submitSearch}>
+                <label className="field-label" htmlFor="to-search">
                   Person
                 </label>
-                <select
-                  id="to"
-                  value={targetId}
-                  onChange={(e) => chooseTarget(e.target.value)}
-                >
+                <input
+                  id="to-search"
+                  list="find-people"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Type a name…"
+                  autoComplete="off"
+                />
+                <datalist id="find-people">
                   {people.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
+                    <option key={p.id} value={p.name} />
                   ))}
-                </select>
-              </div>
+                </datalist>
+                <div className="panel-actions" style={{ marginTop: '0.75rem' }}>
+                  <button type="submit" className="btn-primary">
+                    Find intro
+                  </button>
+                  {filtered.length > 0 && filtered[0].id !== targetId && (
+                    <button
+                      type="button"
+                      className="btn-quiet"
+                      onClick={() => chooseTarget(filtered[0].id)}
+                    >
+                      Use {filtered[0].name.split(' ')[0]}
+                    </button>
+                  )}
+                </div>
+              </form>
 
-              {!ask || !bestPath ? (
+              {people.length > 1 && (
+                <div className="field">
+                  <label className="field-label" htmlFor="to">
+                    Or pick from your graph
+                  </label>
+                  <select
+                    id="to"
+                    value={targetId}
+                    onChange={(e) => chooseTarget(e.target.value)}
+                  >
+                    {people.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {!targetId ? (
+                <div className="verdict">
+                  <strong>Enter a name above</strong>
+                  <p>We’ll add them as a target if they’re not in your graph yet.</p>
+                </div>
+              ) : !ask || !bestPath ? (
                 <div className="verdict">
                   <strong>No intro path yet</strong>
                   <p>
-                    Mark people you actually know on the network map, or add connections, then try
-                    again.
+                    Mark people you actually know on the network map, or add connections between
+                    your contacts and {target?.name ?? 'them'}, then try again.
                   </p>
                   <button type="button" className="btn-quiet" onClick={() => navigate('/')}>
                     Back to network
