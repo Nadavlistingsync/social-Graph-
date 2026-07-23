@@ -17,6 +17,7 @@ import {
   saveWarmthOverride,
   type WarmthOverride,
 } from '../data/preferences'
+import { onUserDataChanged } from '../data/syncBus'
 
 type PreferencesContextValue = {
   version: number
@@ -38,6 +39,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     const onReload = () => bump()
     window.addEventListener('sg-data-reloaded', onReload)
     return () => window.removeEventListener('sg-data-reloaded', onReload)
+  }, [bump])
+
+  useEffect(() => {
+    return onUserDataChanged(() => bump())
   }, [bump])
 
   const value = useMemo<PreferencesContextValue>(() => {

@@ -1,4 +1,13 @@
 import { demoEdges, demoNodes } from './seed'
+import {
+  ensureMegaGraph,
+  getMegaEdgesForNodes,
+  getMegaKnownIds,
+  getMegaNeighbors,
+  getMegaStats,
+  getMegaVisibleNodes,
+  resetMegaGraph,
+} from './megaGraph'
 import { importContactsIntoWorkspace, type ContactImportResult } from './contactImportBatch'
 import type { ParsedContact } from './contactImport'
 import {
@@ -17,6 +26,8 @@ export type WorkspaceProfile = {
   summary: string
   onboarded: boolean
   loadSample: boolean
+  /** 50k procedural demo network */
+  megaSample?: boolean
   /** Who you're trying to meet — sets pathfinding intent */
   targetPerson?: string
 }
@@ -93,17 +104,41 @@ function stripDemoPersonalFields(node: GraphNode): GraphNode {
   return rest
 }
 
-export function getNodes(): GraphNode[] {
+export function isMegaSample(): boolean {
+  return !!readWorkspace().profile.megaSample
+}
+
+export function getNetworkStats(): { people: number; edges: number; yourContacts: number } | null {
+  if (!isMegaSample()) return null
+  return getMegaStats()
+}
+
+export function getNodes(pathIds: string[] = []): GraphNode[] {
   const ws = readWorkspace()
   if (!ws.profile.onboarded) return []
   const you = createYouNode(ws.profile)
+  if (ws.profile.megaSample) {
+    ensureMegaGraph()
+    return [you, ...getMegaVisibleNodes(pathIds)]
+  }
   const sample = ws.profile.loadSample ? demoNodes.map(stripDemoPersonalFields) : []
   return [you, ...sample, ...ws.customNodes]
 }
 
-export function getEdges(): GraphEdge[] {
+export function getEdges(pathIds: string[] = []): GraphEdge[] {
   const ws = readWorkspace()
   if (!ws.profile.onboarded) return []
+  if (ws.profile.megaSample) {
+    ensureMegaGraph()
+    const ids = new Set<string>(['you', ...getMegaKnownIds(), ...pathIds])
+    for (const id of pathIds) {
+      if (id === 'you') continue
+      for (const { nodeId } of getMegaNeighbors(id, 0.15)) {
+        ids.add(nodeId)
+      }
+    }
+    return getMegaEdgesForNodes(ids)
+  }
   const sample = ws.profile.loadSample ? demoEdges : []
   return [...sample, ...ws.customEdges]
 }
@@ -162,15 +197,22 @@ export function slugify(name: string, existingIds: Set<string>): string {
   return id
 }
 
-export function completeOnboarding(name: string, loadSample: boolean, targetPerson?: string): void {
+export function completeOnboarding(
+  name: string,
+  loadSample: boolean,
+  targetPerson?: string,
+  megaSample = false,
+): void {
   const trimmed = name.trim()
   if (!trimmed) return
+  if (megaSample) ensureMegaGraph()
   writeWorkspace({
     profile: {
       name: trimmed,
       summary: defaultWorkspace().profile.summary,
       onboarded: true,
-      loadSample,
+      loadSample: loadSample || megaSample,
+      megaSample,
       targetPerson: targetPerson?.trim() || undefined,
     },
     customNodes: [],
@@ -255,6 +297,7 @@ export function resetWorkspace(): void {
   } catch {
     /* ignore */
   }
+  resetMegaGraph()
   notifyUserDataChanged()
 }
 

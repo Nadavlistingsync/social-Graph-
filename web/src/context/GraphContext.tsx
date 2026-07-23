@@ -15,10 +15,12 @@ import {
   enrichCustomNetwork,
   getCustomNodes,
   getEdges,
+  getNetworkStats,
   getNodes,
   getProfile,
   getYouId,
   importContacts as storeImportContacts,
+  isMegaSample,
   isOnboarded,
   migrateLegacyUser,
   resetWorkspace,
@@ -27,8 +29,11 @@ import {
   updateProfile,
   type WorkspaceProfile,
 } from '../data/graphStore'
+import { ensureMegaGraph } from '../data/megaGraph'
 import { buildEnrichmentCandidates } from '../data/enrichNetwork'
+import { startInvestorDemo as applyInvestorDemo } from '../data/demoMode'
 import { saveWarmthOverride } from '../data/preferences'
+import { onUserDataChanged } from '../data/syncBus'
 import type { ParsedContact } from '../data/contactImport'
 
 type GraphContextValue = {
@@ -36,9 +41,11 @@ type GraphContextValue = {
   youId: string
   profile: WorkspaceProfile
   isOnboarded: boolean
+  isMegaSample: boolean
+  networkStats: { people: number; edges: number; yourContacts: number } | null
   nodes: GraphNode[]
   edges: GraphEdge[]
-  finishOnboarding: (name: string, loadSample: boolean, targetPerson?: string) => void
+  finishOnboarding: (name: string, loadSample: boolean, targetPerson?: string, megaSample?: boolean) => void
   updateProfile: (patch: Partial<WorkspaceProfile>) => void
   setLoadSample: (loadSample: boolean) => void
   addPerson: (
@@ -71,6 +78,7 @@ type GraphContextValue = {
     | { ok: false; error: string }
   >
   resetAll: () => void
+  startInvestorDemo: (name?: string) => void
 }
 
 const GraphContext = createContext<GraphContextValue | null>(null)
@@ -90,6 +98,16 @@ export function GraphProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('sg-data-reloaded', onReload)
   }, [bump])
 
+  useEffect(() => onUserDataChanged(() => bump()), [bump])
+
+  const startInvestorDemo = useCallback(
+    (name?: string) => {
+      applyInvestorDemo(name)
+      bump()
+    },
+    [bump],
+  )
+
   const value = useMemo<GraphContextValue>(() => {
     void version
     const profile = getProfile()
@@ -98,10 +116,13 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       youId: getYouId(),
       profile,
       isOnboarded: isOnboarded(),
+      isMegaSample: isMegaSample(),
+      networkStats: getNetworkStats(),
       nodes: getNodes(),
       edges: getEdges(),
-      finishOnboarding: (name, loadSample, targetPerson) => {
-        completeOnboarding(name, loadSample, targetPerson)
+      finishOnboarding: (name, loadSample, targetPerson, megaSample) => {
+        completeOnboarding(name, loadSample, targetPerson, megaSample)
+        if (megaSample) ensureMegaGraph()
         bump()
       },
       updateProfile: (patch) => {
@@ -206,8 +227,9 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         resetWorkspace()
         bump()
       },
+      startInvestorDemo,
     }
-  }, [version, bump])
+  }, [version, bump, startInvestorDemo])
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>
 }

@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useAuth } from '../context/AuthContext'
 import { useGraph } from '../context/GraphContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { PitchScreen } from './PitchScreen'
 import { RateContacts } from './RateContacts'
 
-type Step = 'auth' | 'intent' | 'profile' | 'contacts' | 'rate'
+type Step = 'pitch' | 'auth' | 'intent' | 'profile' | 'contacts' | 'rate'
 type AuthMode = 'signup' | 'signin'
 
 /** Kept after finishOnboarding so App still shows remaining onboarding steps. */
@@ -51,16 +52,17 @@ function closeContactsGate() {
 function gateStep(): Step {
   try {
     const s = sessionStorage.getItem('sg-onboarding-step')
-    if (s === 'contacts' || s === 'rate' || s === 'profile' || s === 'intent') return s
+    if (s === 'contacts' || s === 'rate' || s === 'profile' || s === 'intent' || s === 'auth')
+      return s
   } catch {
     /* ignore */
   }
-  return isContactsGateOpen() ? 'contacts' : 'auth'
+  return isContactsGateOpen() ? 'contacts' : 'pitch'
 }
 
 function rememberStep(step: Step) {
   try {
-    if (step === 'auth') sessionStorage.removeItem('sg-onboarding-step')
+    if (step === 'pitch' || step === 'auth') sessionStorage.removeItem('sg-onboarding-step')
     else sessionStorage.setItem('sg-onboarding-step', step)
   } catch {
     /* ignore */
@@ -69,8 +71,10 @@ function rememberStep(step: Step) {
 
 export function Onboarding() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const location = useLocation()
   const { user, ready, configured, signInWithPassword, signUpWithPassword } = useAuth()
-  const { finishOnboarding, profile } = useGraph()
+  const { finishOnboarding, profile, startInvestorDemo: launchDemo } = useGraph()
 
   const [step, setStepState] = useState<Step>(() => gateStep())
   const [authMode, setAuthMode] = useState<AuthMode>('signup')
@@ -82,6 +86,8 @@ export function Onboarding() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [demoBooting, setDemoBooting] = useState(false)
+  const demoBooted = useRef(false)
 
   function setStep(next: Step) {
     rememberStep(next)
@@ -89,18 +95,59 @@ export function Onboarding() {
   }
 
   useDocumentTitle(
-    step === 'auth'
-      ? authMode === 'signup'
-        ? 'Create account'
-        : 'Log in'
-      : step === 'intent'
-        ? 'Who are you trying to meet?'
-        : step === 'profile'
-          ? 'Your map'
-          : step === 'rate'
-            ? 'Rate contacts'
-            : 'Contacts',
+    step === 'pitch'
+      ? 'Social Graph'
+      : step === 'auth'
+        ? authMode === 'signup'
+          ? 'Create account'
+          : 'Log in'
+        : step === 'intent'
+          ? 'Who are you trying to meet?'
+          : step === 'profile'
+            ? 'Your map'
+            : step === 'rate'
+              ? 'Rate contacts'
+              : 'Contacts',
   )
+
+  useEffect(() => {
+    if (!ready) return
+    if (params.get('demo') !== '1' && location.pathname !== '/demo') {
+      demoBooted.current = false
+      return
+    }
+    if (demoBooted.current) return
+    demoBooted.current = true
+    setDemoBooting(true)
+    // Yield so the loading UI paints before the 50k graph build.
+    window.setTimeout(() => {
+      try {
+        launchDemo()
+        navigate('/', { replace: true })
+      } catch (err) {
+        console.error(err)
+        setDemoBooting(false)
+        demoBooted.current = false
+        setError('Demo failed to start. Try again.')
+      }
+    }, 50)
+  }, [ready, params, location.pathname, navigate, launchDemo])
+
+  function handleStartDemo() {
+    if (demoBooting) return
+    setDemoBooting(true)
+    setError('')
+    window.setTimeout(() => {
+      try {
+        launchDemo()
+        navigate('/', { replace: true })
+      } catch (err) {
+        console.error(err)
+        setDemoBooting(false)
+        setError('Demo failed to start. Try again.')
+      }
+    }, 50)
+  }
 
   useEffect(() => {
     if (!ready) return
@@ -186,6 +233,34 @@ export function Onboarding() {
           <p className="lede">Loading…</p>
         </div>
       </div>
+    )
+  }
+
+  if (demoBooting) {
+    return (
+      <div className="onboarding">
+        <div className="onboarding-card" id="main">
+          <div className="brand-mark">Social Graph</div>
+          <h1>Building the demo</h1>
+          <p className="lede">Loading 50,000 people and 100k+ connections…</p>
+          <div className="demo-boot-bar" aria-hidden>
+            <span />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'pitch') {
+    return (
+      <PitchScreen
+        onStartDemo={handleStartDemo}
+        onContinue={() => setStep('intent')}
+        onSignIn={() => {
+          setAuthMode('signin')
+          setStep('auth')
+        }}
+      />
     )
   }
 
