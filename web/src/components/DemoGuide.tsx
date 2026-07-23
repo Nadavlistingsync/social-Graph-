@@ -13,14 +13,6 @@ import {
   type DemoStep,
 } from '../data/demoMode'
 
-const AUTO_ADVANCE_MS: Record<DemoStep, number> = {
-  1: 3200,
-  2: 3500,
-  3: 4200,
-  4: 6500,
-  5: 0,
-}
-
 export function DemoGuide() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -28,7 +20,13 @@ export function DemoGuide() {
   const [visible, setVisible] = useState(isDemoMode())
   const [extendedOn, setExtendedOn] = useState(false)
   const [autoPlay, setAutoPlay] = useState(false)
-  const autoTimer = useRef<number | null>(null)
+  const stepRef = useRef(step)
+  const extendedRef = useRef(extendedOn)
+  const locationRef = useRef(location)
+
+  stepRef.current = step
+  extendedRef.current = extendedOn
+  locationRef.current = location
 
   useEffect(() => {
     const sync = () => {
@@ -39,67 +37,61 @@ export function DemoGuide() {
     return () => window.removeEventListener(DEMO_STEP_EVENT, sync)
   }, [])
 
-  useEffect(() => {
-    if (autoTimer.current) {
-      window.clearTimeout(autoTimer.current)
-      autoTimer.current = null
-    }
-    if (!autoPlay || !visible || step >= 5) return
-
-    const delay = step === 4 && location.pathname !== '/find' ? 1200 : AUTO_ADVANCE_MS[step]
-    autoTimer.current = window.setTimeout(() => {
-      handlePrimary(true)
-    }, delay)
-
-    return () => {
-      if (autoTimer.current) window.clearTimeout(autoTimer.current)
-    }
-  }, [autoPlay, visible, step, location.pathname, extendedOn])
-
-  if (!visible) return null
-
-  const config = DEMO_STEPS[step]
-  const onFindStep = step === 4 && location.pathname === '/find'
-
   function advance(next: DemoStep) {
     setDemoStep(next)
     setStepState(next)
     const route = DEMO_STEPS[next]?.route
-    if (route && route !== location.pathname + location.search) {
+    const here = locationRef.current.pathname + locationRef.current.search
+    if (route && route !== here) {
       navigate(route)
     }
   }
 
-  function handlePrimary(fromAuto = false) {
-    if (step === 3 && !extendedOn) {
+  function handlePrimary() {
+    const current = stepRef.current
+    const loc = locationRef.current
+    const extended = extendedRef.current
+
+    if (current === 3 && !extended) {
       window.dispatchEvent(new Event(DEMO_EXTENDED_EVENT))
       setExtendedOn(true)
-      if (!fromAuto) {
-        window.setTimeout(() => advance(4), 500)
-      }
+      window.setTimeout(() => advance(4), 500)
       return
     }
-    if (step === 3 && extendedOn) {
+    if (current === 3 && extended) {
       advance(4)
       return
     }
-    if (step === 4) {
-      if (location.pathname !== '/find') {
+    if (current === 4) {
+      if (loc.pathname !== '/find') {
         navigate(`/find?to=${DEMO_TARGET_ID}`)
+        window.setTimeout(() => advance(5), 300)
         return
       }
       advance(5)
       return
     }
-    if (step === 5) {
+    if (current === 5) {
       setAutoPlay(false)
       startOwnContactsFromDemo()
       setVisible(false)
       navigate('/', { replace: true })
       return
     }
-    advance((step + 1) as DemoStep)
+    advance((current + 1) as DemoStep)
   }
+
+  useEffect(() => {
+    if (!autoPlay || !visible || step >= 5) return
+    const delay = step === 3 && !extendedOn ? 1800 : step === 4 ? 2800 : 2600
+    const timer = window.setTimeout(() => handlePrimary(), delay)
+    return () => window.clearTimeout(timer)
+  }, [autoPlay, visible, step, extendedOn, location.pathname])
+
+  if (!visible) return null
+
+  const config = DEMO_STEPS[step]
+  const onFindStep = step === 4 && location.pathname === '/find'
 
   function handleExit() {
     setAutoPlay(false)
@@ -168,7 +160,7 @@ export function DemoGuide() {
             className="btn-primary demo-guide-cta"
             onClick={() => {
               setAutoPlay(false)
-              handlePrimary(false)
+              handlePrimary()
             }}
           >
             {primaryLabel()}

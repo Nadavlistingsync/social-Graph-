@@ -173,13 +173,19 @@ export function GraphView() {
     if (demoStep === 2) {
       setLayer('mine')
       setSelectedId(DEMO_BRIDGE_ID)
-      setParams({ focus: DEMO_BRIDGE_ID }, { replace: true })
+      setParams((prev) => {
+        if (prev.get('focus') === DEMO_BRIDGE_ID && !prev.get('path')) return prev
+        return { focus: DEMO_BRIDGE_ID }
+      }, { replace: true })
     } else if (demoStep === 3) {
       setLayer('extended')
     } else if (demoStep >= 4) {
       setLayer('extended')
       setSelectedId(DEMO_TARGET_ID)
-      setParams({ focus: DEMO_TARGET_ID, path: DEMO_TARGET_ID }, { replace: true })
+      setParams((prev) => {
+        if (prev.get('focus') === DEMO_TARGET_ID && prev.get('path') === DEMO_TARGET_ID) return prev
+        return { focus: DEMO_TARGET_ID, path: DEMO_TARGET_ID }
+      }, { replace: true })
     }
   }, [inDemo, demoStep, setParams])
 
