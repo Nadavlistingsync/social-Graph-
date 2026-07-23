@@ -76,7 +76,7 @@ export function setDemoStep(step: DemoStep) {
 }
 
 export function getDemoShowcasePath(): RankedPath | null {
-  const paths = findPaths(DEMO_TARGET_ID, { maxDepth: 5, maxPaths: 3, minStrength: 0.35 })
+  const paths = findPaths(DEMO_TARGET_ID, { maxDepth: 12, maxPaths: 3, minStrength: 0.35 })
   return bestFirstHop(paths)?.path ?? paths[0] ?? null
 }
 

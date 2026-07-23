@@ -23,8 +23,8 @@ describe('megaGraph', () => {
     const g = generateMegaGraph(99)
     expect(g.personIds.length).toBe(MEGA_GRAPH_PEOPLE)
     expect(g.edgeCount).toBeGreaterThan(MEGA_GRAPH_PEOPLE)
-    expect(g.names.get(MEGA_TRUMP_ID)).toBe('Donald Trump')
-    expect(g.names.get(MEGA_JAY_ID)).toBe('Jay Neveloff')
+    expect(g.names[g.indexOf.get(MEGA_TRUMP_ID)!]).toBe('Donald Trump')
+    expect(g.names[g.indexOf.get(MEGA_JAY_ID)!]).toBe('Jay Neveloff')
   })
 
   it('finds a path from you to Donald Trump', () => {

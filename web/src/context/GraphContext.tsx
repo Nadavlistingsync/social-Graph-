@@ -100,6 +100,14 @@ export function GraphProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => onUserDataChanged(() => bump()), [bump])
 
+  const startInvestorDemo = useCallback(
+    (name?: string) => {
+      applyInvestorDemo(name)
+      bump()
+    },
+    [bump],
+  )
+
   const value = useMemo<GraphContextValue>(() => {
     void version
     const profile = getProfile()
@@ -219,12 +227,9 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         resetWorkspace()
         bump()
       },
-      startInvestorDemo: (name) => {
-        applyInvestorDemo(name)
-        bump()
-      },
+      startInvestorDemo,
     }
-  }, [version, bump])
+  }, [version, bump, startInvestorDemo])
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>
 }

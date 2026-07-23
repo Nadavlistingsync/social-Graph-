@@ -3,6 +3,7 @@ import {
   ensureMegaGraph,
   getMegaEdgesForNodes,
   getMegaKnownIds,
+  getMegaNeighbors,
   getMegaStats,
   getMegaVisibleNodes,
   resetMegaGraph,
@@ -131,8 +132,9 @@ export function getEdges(pathIds: string[] = []): GraphEdge[] {
     ensureMegaGraph()
     const ids = new Set<string>(['you', ...getMegaKnownIds(), ...pathIds])
     for (const id of pathIds) {
-      for (const { to } of ensureMegaGraph().adjacency.get(id) ?? []) {
-        ids.add(to)
+      if (id === 'you') continue
+      for (const { nodeId } of getMegaNeighbors(id, 0.15)) {
+        ids.add(nodeId)
       }
     }
     return getMegaEdgesForNodes(ids)

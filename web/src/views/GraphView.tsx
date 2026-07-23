@@ -173,15 +173,14 @@ export function GraphView() {
     if (demoStep === 2) {
       setLayer('mine')
       setSelectedId(DEMO_BRIDGE_ID)
-      setParams({ focus: DEMO_BRIDGE_ID })
-    }
-    if (demoStep === 3) setLayer('extended')
-    if (demoStep >= 4) {
+      setParams({ focus: DEMO_BRIDGE_ID }, { replace: true })
+    } else if (demoStep === 3) {
+      setLayer('extended')
+    } else if (demoStep >= 4) {
       setLayer('extended')
       setSelectedId(DEMO_TARGET_ID)
-      setParams({ focus: DEMO_TARGET_ID })
+      setParams({ focus: DEMO_TARGET_ID, path: DEMO_TARGET_ID }, { replace: true })
     }
-    setFitTick((n) => n + 1)
   }, [inDemo, demoStep, setParams])
 
   const strongEdges = useMemo(() => {
@@ -221,7 +220,7 @@ export function GraphView() {
     }
     ids.add(selectedId)
     return ids
-  }, [myPeople, strongEdges, layer, selectedId, inDemo, demoPath, demoStep])
+  }, [myPeople, strongEdges, layer, selectedId, inDemo, demoPath, demoStep, isMegaSample, pathIds])
 
   const filteredEdges = useMemo(() => {
     return strongEdges.filter(

@@ -34,15 +34,20 @@ const TITLES = [
   'Principal', 'General Partner', 'Operator', 'Advisor', 'Head of', 'Director',
 ]
 
-type AdjEntry = { to: string; edge: GraphEdge }
-
+/** Compact adjacency: index → list of neighbor indices (+ special you=-1 handled separately). */
 export type MegaGraphState = {
+  /** personIds[i] for i in 0..N-1 */
   personIds: string[]
-  adjacency: Map<string, AdjEntry[]>
-  names: Map<string, string>
+  /** id → index */
+  indexOf: Map<string, number>
+  /** neighbors[i] = packed neighbor indices */
+  neighbors: Int32Array[]
+  names: string[]
   knownByYou: Set<string>
   edgeCount: number
   pathCache: Map<string, string[]>
+  /** you → known contact indices */
+  youNeighbors: number[]
 }
 
 let state: MegaGraphState | null = null
@@ -56,13 +61,23 @@ function mulberry32(seed: number) {
   }
 }
 
-function makeEdge(source: string, target: string, strength: number, type: GraphEdge['type'] = 'partner'): GraphEdge {
+function personId(i: number): string {
+  return `person-${i}`
+}
+
+function hashCode(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+  return h
+}
+
+function makeEdge(source: string, target: string, strength: number): GraphEdge {
   const [a, b] = source < target ? [source, target] : [target, source]
   return {
     id: `e-${a}-${b}`,
     source,
     target,
-    type,
+    type: 'partner',
     strength,
     recency: '2024-06-15',
     explanation: 'Inferred from public overlap and contact graph.',
@@ -78,99 +93,79 @@ function makeEdge(source: string, target: string, strength: number, type: GraphE
   }
 }
 
-function addEdge(
-  adj: Map<string, AdjEntry[]>,
-  edgeKeys: Set<string>,
-  source: string,
-  target: string,
-  strength: number,
-) {
-  if (source === target) return false
-  const [a, b] = source < target ? [source, target] : [target, source]
-  const key = `${a}|${b}`
-  if (edgeKeys.has(key)) return false
-  edgeKeys.add(key)
-  const edge = makeEdge(source, target, strength)
-  const listA = adj.get(source) ?? []
-  listA.push({ to: target, edge })
-  adj.set(source, listA)
-  const listB = adj.get(target) ?? []
-  listB.push({ to: source, edge: { ...edge, source: target, target: source } })
-  adj.set(target, listB)
-  return true
-}
-
-function personId(i: number): string {
-  return `person-${i}`
-}
-
-function buildNames(rng: () => number): Map<string, string> {
-  const names = new Map<string, string>()
-  names.set(MEGA_JAY_ID, 'Jay Neveloff')
-  names.set(MEGA_TRUMP_ID, 'Donald Trump')
-
-  for (let i = 0; i < MEGA_GRAPH_PEOPLE - 2; i++) {
-    const first = FIRST_NAMES[Math.floor(rng() * FIRST_NAMES.length)]
-    const last = LAST_NAMES[Math.floor(rng() * LAST_NAMES.length)]
-    names.set(personId(i), `${first} ${last}`)
-  }
-  return names
-}
-
 export function generateMegaGraph(seed = 42): MegaGraphState {
   const rng = mulberry32(seed)
-  const personIds: string[] = [MEGA_JAY_ID]
-  for (let i = 0; i < MEGA_GRAPH_PEOPLE - 2; i++) personIds.push(personId(i))
-  personIds.push(MEGA_TRUMP_ID)
+  const n = MEGA_GRAPH_PEOPLE
+  const personIds: string[] = new Array(n)
+  personIds[0] = MEGA_JAY_ID
+  for (let i = 1; i < n - 1; i++) personIds[i] = personId(i - 1)
+  personIds[n - 1] = MEGA_TRUMP_ID
 
-  const names = buildNames(rng)
-  const adjacency = new Map<string, AdjEntry[]>()
-  const edgeKeys = new Set<string>()
+  const indexOf = new Map<string, number>()
+  for (let i = 0; i < n; i++) indexOf.set(personIds[i], i)
+
+  const names: string[] = new Array(n)
+  names[0] = 'Jay Neveloff'
+  names[n - 1] = 'Donald Trump'
+  for (let i = 1; i < n - 1; i++) {
+    names[i] =
+      `${FIRST_NAMES[Math.floor(rng() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(rng() * LAST_NAMES.length)]}`
+  }
+
+  // Build undirected edges as sets of neighbor indices, then freeze to Int32Array.
+  const buckets: number[][] = Array.from({ length: n }, () => [])
+  const seen = new Set<string>()
   let edgeCount = 0
 
-  for (let i = 0; i < personIds.length; i++) {
-    const a = personIds[i]
-    const b = personIds[(i + 1) % personIds.length]
-    if (addEdge(adjacency, edgeKeys, a, b, 0.55 + rng() * 0.2)) edgeCount++
+  const link = (a: number, b: number) => {
+    if (a === b) return
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`
+    if (seen.has(key)) return
+    seen.add(key)
+    buckets[a].push(b)
+    buckets[b].push(a)
+    edgeCount++
   }
 
-  const shortcuts = Math.floor(personIds.length * 1.1)
+  // Ring backbone — everyone reachable.
+  for (let i = 0; i < n; i++) link(i, (i + 1) % n)
+
+  // Small-world shortcuts.
+  const shortcuts = Math.floor(n * 0.9)
   for (let i = 0; i < shortcuts; i++) {
-    const a = personIds[Math.floor(rng() * personIds.length)]
-    const b = personIds[Math.floor(rng() * personIds.length)]
-    if (addEdge(adjacency, edgeKeys, a, b, 0.45 + rng() * 0.35)) edgeCount++
+    link(Math.floor(rng() * n), Math.floor(rng() * n))
   }
 
-  for (let i = 0; i < personIds.length; i += 37) {
-    for (let j = 1; j <= 4; j++) {
-      const a = personIds[i]
-      const b = personIds[(i + j) % personIds.length]
-      if (addEdge(adjacency, edgeKeys, a, b, 0.6 + rng() * 0.25)) edgeCount++
-    }
+  // Local clusters.
+  for (let i = 0; i < n; i += 40) {
+    for (let j = 1; j <= 3; j++) link(i, (i + j) % n)
   }
+
+  // Jay ↔ mid ↔ Trump bridge.
+  const mid = Math.floor((0 + (n - 1)) / 2)
+  link(0, mid)
+  link(mid, n - 1)
 
   const knownByYou = new Set<string>([MEGA_JAY_ID])
+  const youNeighbors: number[] = [0]
   for (let i = 0; i < MEGA_YOUR_CONTACTS; i++) {
-    knownByYou.add(personId(i))
+    const idx = i + 1 // person-0 .. skip Jay at 0
+    if (idx >= n - 1) break
+    knownByYou.add(personIds[idx])
+    youNeighbors.push(idx)
   }
 
-  for (const id of knownByYou) {
-    if (addEdge(adjacency, edgeKeys, 'you', id, 0.82 + rng() * 0.12)) edgeCount++
-  }
-
-  const trumpIndex = personIds.indexOf(MEGA_TRUMP_ID)
-  const jayIndex = personIds.indexOf(MEGA_JAY_ID)
-  const mid = personIds[Math.floor((trumpIndex + jayIndex) / 2)]
-  if (addEdge(adjacency, edgeKeys, MEGA_JAY_ID, mid, 0.78)) edgeCount++
-  if (addEdge(adjacency, edgeKeys, mid, MEGA_TRUMP_ID, 0.72)) edgeCount++
+  const neighbors = buckets.map((b) => Int32Array.from(b))
 
   return {
     personIds,
-    adjacency,
+    indexOf,
+    neighbors,
     names,
     knownByYou,
-    edgeCount,
+    edgeCount: edgeCount + youNeighbors.length,
     pathCache: new Map(),
+    youNeighbors,
   }
 }
 
@@ -200,19 +195,12 @@ export function getMegaPersonIds(): string[] {
   return ensureMegaGraph().personIds
 }
 
-function hashCode(n: number | string): number {
-  const s = String(n)
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
-  return h
-}
-
 export function getMegaNode(id: string): GraphNode | undefined {
   const g = ensureMegaGraph()
   if (id === 'you') return undefined
-  const name = g.names.get(id)
-  if (!name) return undefined
-
+  const idx = g.indexOf.get(id)
+  if (idx === undefined) return undefined
+  const name = g.names[idx]
   const isJay = id === MEGA_JAY_ID
   const isTrump = id === MEGA_TRUMP_ID
   const known = g.knownByYou.has(id)
@@ -233,25 +221,50 @@ export function getMegaNode(id: string): GraphNode | undefined {
   }
 }
 
+function edgeBetween(fromId: string, toId: string, strength = 0.65): GraphEdge {
+  return makeEdge(fromId, toId, strength)
+}
+
 export function getMegaNeighbors(
   id: string,
   minStrength: number,
 ): { nodeId: string; edge: GraphEdge }[] {
   const g = ensureMegaGraph()
-  const list = g.adjacency.get(id) ?? []
-  return list.filter((e) => e.edge.strength >= minStrength).map((e) => ({ nodeId: e.to, edge: e.edge }))
+  if (minStrength > 0.9) return []
+
+  if (id === 'you') {
+    return g.youNeighbors.map((idx) => {
+      const nodeId = g.personIds[idx]
+      const strength = nodeId === MEGA_JAY_ID ? 0.88 : 0.82
+      return { nodeId, edge: edgeBetween('you', nodeId, strength) }
+    })
+  }
+
+  const idx = g.indexOf.get(id)
+  if (idx === undefined) return []
+  const out: { nodeId: string; edge: GraphEdge }[] = []
+  for (const nIdx of g.neighbors[idx]) {
+    const nodeId = g.personIds[nIdx]
+    out.push({ nodeId, edge: edgeBetween(id, nodeId, 0.62) })
+  }
+  // Include you if this person is a known contact.
+  if (g.knownByYou.has(id)) {
+    out.push({
+      nodeId: 'you',
+      edge: edgeBetween(id, 'you', id === MEGA_JAY_ID ? 0.88 : 0.82),
+    })
+  }
+  return out
 }
 
 export function getMegaEdgesForNodes(ids: Set<string>): GraphEdge[] {
-  const g = ensureMegaGraph()
   const seen = new Set<string>()
   const edges: GraphEdge[] = []
   for (const id of ids) {
-    for (const { to, edge } of g.adjacency.get(id) ?? []) {
-      if (!ids.has(to)) continue
-      const key = edge.id
-      if (seen.has(key)) continue
-      seen.add(key)
+    for (const { nodeId, edge } of getMegaNeighbors(id, 0.15)) {
+      if (!ids.has(nodeId)) continue
+      if (seen.has(edge.id)) continue
+      seen.add(edge.id)
       edges.push(edge)
     }
   }
@@ -265,28 +278,42 @@ export function getMegaShortestPath(fromId: string, targetId: string): string[] 
   const cached = g.pathCache.get(cacheKey)
   if (cached) return cached
 
-  const queue: string[] = [fromId]
-  const prev = new Map<string, string | null>([[fromId, null]])
+  // BFS over indices; you is virtual node -1.
+  const YOU = -1
+  const fromIdx = fromId === 'you' ? YOU : g.indexOf.get(fromId)
+  const targetIdx = targetId === 'you' ? YOU : g.indexOf.get(targetId)
+  if (fromIdx === undefined || targetIdx === undefined) return null
+
+  const queue: number[] = [fromIdx]
+  const prev = new Map<number, number | null>([[fromIdx, null]])
+
+  const neighborsOf = (idx: number): number[] => {
+    if (idx === YOU) return g.youNeighbors
+    const list = [...g.neighbors[idx]]
+    if (g.knownByYou.has(g.personIds[idx])) list.push(YOU)
+    return list
+  }
 
   while (queue.length) {
     const current = queue.shift()!
-    if (current === targetId) break
-    for (const { to } of g.adjacency.get(current) ?? []) {
-      if (prev.has(to)) continue
-      prev.set(to, current)
-      queue.push(to)
+    if (current === targetIdx) break
+    for (const next of neighborsOf(current)) {
+      if (prev.has(next)) continue
+      prev.set(next, current)
+      queue.push(next)
     }
   }
 
-  if (!prev.has(targetId)) return null
+  if (!prev.has(targetIdx)) return null
 
-  const path: string[] = []
-  let cur: string | null = targetId
-  while (cur) {
-    path.unshift(cur)
+  const pathIdx: number[] = []
+  let cur: number | null = targetIdx
+  while (cur !== null) {
+    pathIdx.unshift(cur)
     cur = prev.get(cur) ?? null
   }
 
+  const path = pathIdx.map((i) => (i === YOU ? 'you' : g.personIds[i]))
   g.pathCache.set(cacheKey, path)
   return path
 }
@@ -294,36 +321,44 @@ export function getMegaShortestPath(fromId: string, targetId: string): string[] 
 export function searchMegaNodes(query: string, limit = 20): GraphNode[] {
   const g = ensureMegaGraph()
   const q = query.trim().toLowerCase()
-  if (!q) {
-    return [MEGA_TRUMP_ID, MEGA_JAY_ID, ...g.personIds.slice(0, limit - 2)]
-      .map((id) => getMegaNode(id))
-      .filter((n): n is GraphNode => !!n)
-  }
-
   const results: GraphNode[] = []
-  for (const special of [MEGA_TRUMP_ID, MEGA_JAY_ID]) {
-    const n = getMegaNode(special)
-    if (n && n.name.toLowerCase().includes(q)) results.push(n)
+
+  const pushId = (id: string) => {
+    if (results.length >= limit) return
+    if (results.some((r) => r.id === id)) return
+    const node = getMegaNode(id)
+    if (node) results.push(node)
   }
 
-  for (const id of g.personIds) {
-    if (results.length >= limit) break
-    const name = g.names.get(id) ?? ''
-    if (name.toLowerCase().includes(q)) {
-      const node = getMegaNode(id)
-      if (node) results.push(node)
-    }
+  if (!q) {
+    pushId(MEGA_TRUMP_ID)
+    pushId(MEGA_JAY_ID)
+    for (let i = 1; i < Math.min(g.personIds.length, limit + 2); i++) pushId(g.personIds[i])
+    return results.slice(0, limit)
   }
-  return results.slice(0, limit)
+
+  for (const special of [MEGA_TRUMP_ID, MEGA_JAY_ID]) {
+    if (g.names[g.indexOf.get(special)!].toLowerCase().includes(q)) pushId(special)
+  }
+
+  for (let i = 0; i < g.names.length && results.length < limit; i++) {
+    if (g.names[i].toLowerCase().includes(q)) pushId(g.personIds[i])
+  }
+  return results
 }
 
 export function getMegaVisibleNodes(pathIds: string[] = []): GraphNode[] {
   const g = ensureMegaGraph()
   const ids = new Set<string>([...g.knownByYou])
-  for (const id of pathIds) ids.add(id)
   for (const id of pathIds) {
-    for (const { to } of g.adjacency.get(id) ?? []) {
-      ids.add(to)
+    if (id !== 'you') ids.add(id)
+  }
+  for (const id of pathIds) {
+    if (id === 'you') continue
+    const idx = g.indexOf.get(id)
+    if (idx === undefined) continue
+    for (const nIdx of g.neighbors[idx]) {
+      ids.add(g.personIds[nIdx])
       if (ids.size > 180) break
     }
   }

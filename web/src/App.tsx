@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { DemoGuide } from './components/DemoGuide'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -19,6 +19,8 @@ function AppRoutes() {
   const { isOnboarded, startInvestorDemo: launchDemo } = useGraph()
   const [contactsGate, setContactsGate] = useState(isContactsGateOpen)
   const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const demoBooted = useRef(false)
 
   useEffect(() => {
     const sync = () => setContactsGate(isContactsGateOpen())
@@ -28,10 +30,21 @@ function AppRoutes() {
 
   useEffect(() => {
     if (!authReady) return
-    if (params.get('demo') === '1') {
-      launchDemo()
+    if (params.get('demo') !== '1') {
+      demoBooted.current = false
+      return
     }
-  }, [authReady, params, launchDemo])
+    if (demoBooted.current) return
+    demoBooted.current = true
+    try {
+      launchDemo()
+    } catch (err) {
+      console.error('Demo failed to start', err)
+      demoBooted.current = false
+      return
+    }
+    navigate('/', { replace: true })
+  }, [authReady, params, launchDemo, navigate])
 
   if (!authReady) {
     return (

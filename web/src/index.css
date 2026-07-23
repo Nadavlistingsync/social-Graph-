@@ -1059,11 +1059,30 @@ line.demo-path-edge {
   padding: 0.85rem 1rem;
 }
 
-.pitch-autoplay-hint {
-  text-align: center;
-  font-size: 0.78rem;
-  color: var(--text-faint);
-  margin: 0.55rem 0 0;
+.demo-boot-bar {
+  margin-top: 1.25rem;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.demo-boot-bar span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  border-radius: 999px;
+  animation: demoBootSlide 1.1s ease-in-out infinite;
+}
+
+@keyframes demoBootSlide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
 }
 
 .pitch-secondary {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ContactAuthPanel } from '../components/ContactAuthPanel'
 import { useAuth } from '../context/AuthContext'
@@ -86,6 +86,8 @@ export function Onboarding() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [demoBooting, setDemoBooting] = useState(false)
+  const demoBooted = useRef(false)
 
   function setStep(next: Step) {
     rememberStep(next)
@@ -110,15 +112,41 @@ export function Onboarding() {
 
   useEffect(() => {
     if (!ready) return
-    if (params.get('demo') === '1' || location.pathname === '/demo') {
-      launchDemo()
-      navigate('/', { replace: true })
+    if (params.get('demo') !== '1' && location.pathname !== '/demo') {
+      demoBooted.current = false
+      return
     }
+    if (demoBooted.current) return
+    demoBooted.current = true
+    setDemoBooting(true)
+    // Yield so the loading UI paints before the 50k graph build.
+    window.setTimeout(() => {
+      try {
+        launchDemo()
+        navigate('/', { replace: true })
+      } catch (err) {
+        console.error(err)
+        setDemoBooting(false)
+        demoBooted.current = false
+        setError('Demo failed to start. Try again.')
+      }
+    }, 50)
   }, [ready, params, location.pathname, navigate, launchDemo])
 
   function handleStartDemo() {
-    launchDemo()
-    navigate('/', { replace: true })
+    if (demoBooting) return
+    setDemoBooting(true)
+    setError('')
+    window.setTimeout(() => {
+      try {
+        launchDemo()
+        navigate('/', { replace: true })
+      } catch (err) {
+        console.error(err)
+        setDemoBooting(false)
+        setError('Demo failed to start. Try again.')
+      }
+    }, 50)
   }
 
   useEffect(() => {
@@ -203,6 +231,21 @@ export function Onboarding() {
         <div className="onboarding-card" id="main">
           <div className="brand-mark">Social Graph</div>
           <p className="lede">Loading…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (demoBooting) {
+    return (
+      <div className="onboarding">
+        <div className="onboarding-card" id="main">
+          <div className="brand-mark">Social Graph</div>
+          <h1>Building the demo</h1>
+          <p className="lede">Loading 50,000 people and 100k+ connections…</p>
+          <div className="demo-boot-bar" aria-hidden>
+            <span />
+          </div>
         </div>
       </div>
     )
